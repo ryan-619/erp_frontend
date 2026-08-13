@@ -5,7 +5,7 @@
 // Payload Schema: { header, footer, school_logo }
 // ====================================================================
 
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { FileBadge, RotateCcw, Printer, Download, Save, Upload, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,26 +15,39 @@ import { PageHeader } from '@/components/PageHeader'
 import { FormSection } from '@/components/FormSection'
 import { examinationService } from '@/services/examination.service'
 import { useToast } from '@/hooks/use-toast'
+import { useAsyncData } from '@/hooks/useAsyncData'
 
 const INITIAL_FORM = {
-  header: 'ABC PUBLIC SCHOOL',
-  footer: 'Principal Signature',
+  header: '',
+  footer: '',
   school_logo: '',
 }
-
-const PREVIEW_SUBJECTS = [
-  { subject: 'English', max: 100, obtained: 91, grade: 'A+', remarks: 'Excellent' },
-  { subject: 'Mathematics', max: 100, obtained: 95, grade: 'A+', remarks: 'Outstanding' },
-  { subject: 'Science', max: 100, obtained: 88, grade: 'A', remarks: 'Very Good' },
-  { subject: 'Social Science', max: 100, obtained: 90, grade: 'A+', remarks: 'Excellent' },
-  { subject: 'Hindi', max: 100, obtained: 85, grade: 'B+', remarks: 'Good' },
-]
 
 export default function DesignMarksheetPage() {
   const { toast } = useToast()
   const fileInputRef = useRef(null)
   const [form, setForm] = useState(INITIAL_FORM)
   const [isSaving, setIsSaving] = useState(false)
+  const [existingDesignId, setExistingDesignId] = useState(null)
+
+  // Fetch existing marksheet design on load (with cache busting)
+  const { data: designsData, isLoading } = useAsyncData(
+    () => examinationService.getMarksheetDesigns({ _t: Date.now() }),
+    []
+  )
+
+  // Load existing design into form
+  useEffect(() => {
+    if (designsData?.data?.length > 0) {
+      const existingDesign = designsData.data[0]
+      setForm({
+        header: existingDesign.header || '',
+        footer: existingDesign.footer || '',
+        school_logo: existingDesign.school_logo || '',
+      })
+      setExistingDesignId(existingDesign._id)
+    }
+  }, [designsData])
 
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0]
@@ -66,10 +79,18 @@ export default function DesignMarksheetPage() {
       const payload = {
         header: form.header.trim(),
         footer: form.footer.trim(),
-        school_logo: form.school_logo.trim(),
+        school_logo: form.school_logo || '',
       }
-      await examinationService.createMarksheetDesign(payload)
-      toast({ title: '✓ Template Saved Successfully' })
+      
+      if (existingDesignId) {
+        // Update existing design
+        await examinationService.updateMarksheetDesign(existingDesignId, payload)
+        toast({ title: '✓ Template Updated Successfully' })
+      } else {
+        // Create new design
+        await examinationService.createMarksheetDesign(payload)
+        toast({ title: '✓ Template Saved Successfully' })
+      }
     } catch (error) {
       toast({
         title: 'Save Failed',
@@ -82,14 +103,6 @@ export default function DesignMarksheetPage() {
   }
 
   const handlePrint = () => window.print()
-
-  const studentInfo = useMemo(() => [
-    { label: 'Student Name', val: 'Rahul Sharma' },
-    { label: 'Admission No', val: '10234' },
-    { label: 'Roll No', val: '18' },
-    { label: 'Class', val: 'X-A' },
-    { label: 'Session', val: '2026-27' },
-  ], [])
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -224,18 +237,16 @@ export default function DesignMarksheetPage() {
                 <h1 className="text-lg font-black tracking-wide text-black uppercase">
                   {form.header || 'SCHOOL NAME'}
                 </h1>
-                <p className="text-xs font-semibold text-gray-700 mt-0.5">Annual Examination 2026</p>
-                <p className="text-[10px] text-gray-500">Affiliated to CBSE, New Delhi</p>
+                <p className="text-xs font-semibold text-gray-700 mt-0.5">Examination Name</p>
+                <p className="text-[10px] text-gray-500">Affiliation Details</p>
               </div>
 
               {/* Student Information */}
               <div className="border border-gray-300 bg-gray-50 rounded p-3 text-xs grid grid-cols-2 gap-y-1.5 gap-x-4">
-                {studentInfo.map((info) => (
-                  <div key={info.label} className={info.label === 'Session' ? 'col-span-2' : ''}>
-                    <span className="font-semibold text-gray-600">{info.label} : </span>
-                    <span className="font-bold text-black">{info.val}</span>
-                  </div>
-                ))}
+                <div><span className="font-semibold text-gray-600">Student Name : </span><span className="font-bold text-black">---</span></div>
+                <div><span className="font-semibold text-gray-600">Roll No : </span><span className="font-bold text-black">---</span></div>
+                <div><span className="font-semibold text-gray-600">Class : </span><span className="font-bold text-black">---</span></div>
+                <div><span className="font-semibold text-gray-600">Session : </span><span className="font-bold text-black">---</span></div>
               </div>
 
               {/* Subject Table */}
@@ -250,24 +261,36 @@ export default function DesignMarksheetPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {PREVIEW_SUBJECTS.map((item) => (
-                    <tr key={item.subject} className="border-b border-gray-200">
-                      <td className="border-r border-gray-300 px-2.5 py-1.5 font-medium">{item.subject}</td>
-                      <td className="border-r border-gray-300 px-2.5 py-1.5 text-center">{item.max}</td>
-                      <td className="border-r border-gray-300 px-2.5 py-1.5 text-center font-bold">{item.obtained}</td>
-                      <td className="border-r border-gray-300 px-2.5 py-1.5 text-center font-semibold">{item.grade}</td>
-                      <td className="px-2.5 py-1.5 text-gray-600">{item.remarks}</td>
-                    </tr>
-                  ))}
+                  <tr className="border-b border-gray-200">
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 font-medium">Subject 1</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center">100</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center font-bold">--</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center font-semibold">--</td>
+                    <td className="px-2.5 py-1.5 text-gray-600">--</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 font-medium">Subject 2</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center">100</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center font-bold">--</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center font-semibold">--</td>
+                    <td className="px-2.5 py-1.5 text-gray-600">--</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 font-medium">Subject 3</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center">100</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center font-bold">--</td>
+                    <td className="border-r border-gray-300 px-2.5 py-1.5 text-center font-semibold">--</td>
+                    <td className="px-2.5 py-1.5 text-gray-600">--</td>
+                  </tr>
                 </tbody>
               </table>
 
               {/* Results Summary */}
               <div className="border border-gray-300 bg-gray-50 rounded p-2.5 text-xs flex justify-between items-center font-semibold text-black">
-                <span>Total Marks : 449 / 500</span>
-                <span>Percentage : 89.8%</span>
-                <span>Overall Grade : A+</span>
-                <span className="text-emerald-700 font-bold">Result : PASS</span>
+                <span>Total Marks : -- / --</span>
+                <span>Percentage : --%</span>
+                <span>Overall Grade : --</span>
+                <span className="text-emerald-700 font-bold">Result : --</span>
               </div>
 
               {/* Signatures */}

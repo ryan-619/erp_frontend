@@ -25,6 +25,7 @@ import { useAsyncData } from '@/hooks/useAsyncData'
 import { useExamResults } from '@/hooks/useExaminations'
 import { examinationService } from '@/services/examination.service'
 import { academicsService } from '@/services/academics.service'
+import apiClient from '@/services/api'
 import { useToast } from '@/hooks/use-toast'
 
 const getId = (val) => {
@@ -37,7 +38,32 @@ const calcPct = (obtained, total) => {
   const numObtained = Number(obtained) || 0
   const numTotal = Number(total) || 0
   if (numTotal <= 0) return '0.00'
-  return ((numObtained / numTotal) * 100).toFixed(2)
+  // Cap percentage at 100% if marks exceed total (for existing invalid data)
+  const pct = (numObtained / numTotal) * 100
+  return Math.min(pct, 100).toFixed(2)
+}
+
+const validateForm = (formData, setValidationError) => {
+  const marksObtained = Number(formData.marks_obtained)
+  const totalMarks = Number(formData.total_marks)
+  
+  if (marksObtained > totalMarks) {
+    setValidationError('Marks obtained cannot exceed total marks')
+    return false
+  }
+  
+  if (marksObtained < 0) {
+    setValidationError('Marks obtained cannot be negative')
+    return false
+  }
+  
+  if (totalMarks <= 0) {
+    setValidationError('Total marks must be greater than 0')
+    return false
+  }
+  
+  setValidationError('')
+  return true
 }
 
 export function ExamResultsPage() {
@@ -56,6 +82,9 @@ export function ExamResultsPage() {
     total_marks: '100',
   })
 
+  // Validation state
+  const [validationError, setValidationError] = useState('')
+
   // Hook from @/hooks/useExaminations
   const {
     rows,
@@ -69,62 +98,48 @@ export function ExamResultsPage() {
     refetch,
   } = useExamResults()
 
-  // Fetch backend datasets (Exam Groups, Subjects, Classes) for dropdowns
+  // Fetch backend datasets (Exam Groups, Subjects, Classes, Students) for dropdowns and display
   const { data: rawGroups } = useAsyncData(() => examinationService.getExamGroups(), [])
   const { data: rawSubjects } = useAsyncData(() => academicsService.subjects(), [])
   const { data: rawClasses } = useAsyncData(() => academicsService.classes(), [])
+  const { data: rawStudents } = useAsyncData(() => apiClient.get('/students?page=1&limit=5000'), [])
 
   const groups = useMemo(() => (Array.isArray(rawGroups?.data) ? rawGroups.data : Array.isArray(rawGroups) ? rawGroups : []), [rawGroups])
   const subjects = useMemo(() => (Array.isArray(rawSubjects?.data) ? rawSubjects.data : Array.isArray(rawSubjects) ? rawSubjects : []), [rawSubjects])
   const classes = useMemo(() => (Array.isArray(rawClasses?.data) ? rawClasses.data : Array.isArray(rawClasses) ? rawClasses : []), [rawClasses])
+  const students = useMemo(() => (Array.isArray(rawStudents?.data) ? rawStudents.data : Array.isArray(rawStudents) ? rawStudents : []), [rawStudents])
 
   // ID -> Object / Display Name Maps
   const groupMap = useMemo(() => Object.fromEntries(groups.map((x) => [getId(x), x.exam_name || x.name || 'N/A'])), [groups])
   const subjectMap = useMemo(() => Object.fromEntries(subjects.map((x) => [getId(x), x.subject_name || x.name || 'N/A'])), [subjects])
   const classMap = useMemo(() => Object.fromEntries(classes.map((x) => [getId(x), x.class_name || x.name || 'N/A'])), [classes])
+  const studentMap = useMemo(() => {
+    const map = {}
+    students.forEach((s) => {
+      const id = getId(s)
+      const name = s.name?.first && s.name?.last 
+        ? `${s.name.first} ${s.name.last}`
+        : s.first_name && s.last_name
+        ? `${s.first_name} ${s.last_name}`
+        : s.name || 'Unknown'
+      const className = s.class_name || s.class_id || 'N/A'
+      const section = s.section || ''
+      map[id] = {
+        name,
+        className,
+        section,
+        fullName: name,
+        classSection: section ? `${className} - ${section}` : className
+      }
+    })
+    return map
+  }, [students])
 
   // Table Columns
   const columns = useMemo(() => [
     {
-      accessorKey: 'student_id',
-      header: 'Student',
-      cell: ({ row }) => (
-        <span className="font-medium text-foreground">
-          {row.original.student_id ? String(row.original.student_id) : 'N/A'}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'class',
-      header: 'Class/Section',
-      cell: () => 'N/A',
-    },
-    {
-      accessorKey: 'exam_group_id',
-      header: 'Exam Group',
-      cell: ({ row }) => groupMap[getId(row.original.exam_group_id)] || 'N/A',
-    },
-    {
-      accessorKey: 'subject_id',
-      header: 'Subject',
-      cell: ({ row }) => subjectMap[getId(row.original.subject_id)] || 'N/A',
-    },
-    {
-      accessorKey: 'marks',
-      header: 'Marks',
-      cell: ({ row }) => `${row.original.marks_obtained ?? 0} / ${row.original.total_marks ?? 0}`,
-    },
-    {
-      accessorKey: 'percentage',
-      header: 'Percentage',
-      cell: ({ row }) => {
-        const pct = calcPct(row.original.marks_obtained, row.original.total_marks)
-        return <Badge variant={Number(pct) >= 40 ? 'default' : 'destructive'}>{pct}%</Badge>
-      },
-    },
-    {
       id: 'actions',
-      header: '',
+      header: 'Action',
       size: 48,
       enableSorting: false,
       cell: ({ row }) => (
@@ -151,11 +166,55 @@ export function ExamResultsPage() {
         />
       ),
     },
-  ], [groupMap, subjectMap])
+    {
+      accessorKey: 'student_id',
+      header: 'Student',
+      cell: ({ row }) => {
+        const studentData = studentMap[getId(row.original.student_id)]
+        return (
+          <span className="font-medium text-foreground">
+            {studentData?.fullName || String(row.original.student_id) || 'N/A'}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'class',
+      header: 'Class/Section',
+      cell: ({ row }) => {
+        const studentData = studentMap[getId(row.original.student_id)]
+        return studentData?.classSection || 'N/A'
+      },
+    },
+    {
+      accessorKey: 'exam_group_id',
+      header: 'Exam Group',
+      cell: ({ row }) => groupMap[getId(row.original.exam_group_id)] || 'N/A',
+    },
+    {
+      accessorKey: 'subject_id',
+      header: 'Subject',
+      cell: ({ row }) => subjectMap[getId(row.original.subject_id)] || 'N/A',
+    },
+    {
+      accessorKey: 'marks',
+      header: 'Marks',
+      cell: ({ row }) => `${row.original.marks_obtained ?? 0} / ${row.original.total_marks ?? 0}`,
+    },
+    {
+      accessorKey: 'percentage',
+      header: 'Percentage',
+      cell: ({ row }) => {
+        const pct = calcPct(row.original.marks_obtained, row.original.total_marks)
+        return <Badge variant={Number(pct) >= 40 ? 'default' : 'destructive'}>{pct}%</Badge>
+      },
+    },
+  ], [groupMap, subjectMap, studentMap])
 
   // View Drawer Content
   const viewDetails = viewRow ? [
-    { label: 'Student ID', value: viewRow.student_id ? String(viewRow.student_id) : 'N/A' },
+    { label: 'Student', value: studentMap[getId(viewRow.student_id)]?.fullName || String(viewRow.student_id) || 'N/A' },
+    { label: 'Class/Section', value: studentMap[getId(viewRow.student_id)]?.classSection || 'N/A' },
     { label: 'Exam Group', value: groupMap[getId(viewRow.exam_group_id)] || 'N/A' },
     { label: 'Subject', value: subjectMap[getId(viewRow.subject_id)] || 'N/A' },
     { label: 'Marks', value: `${viewRow.marks_obtained ?? 0} / ${viewRow.total_marks ?? 0}` },
@@ -238,6 +297,7 @@ export function ExamResultsPage() {
           if (!o) {
             setAddOpen(false)
             setEditRow(null)
+            setValidationError('')
           }
         }}
         title={editRow ? 'Edit Exam Result' : 'Add Exam Result'}
@@ -250,12 +310,16 @@ export function ExamResultsPage() {
               onClick={() => {
                 setAddOpen(false)
                 setEditRow(null)
+                setValidationError('')
               }}
             >
               Cancel
             </Button>
             <Button
               onClick={() => {
+                if (!validateForm(formData, setValidationError)) {
+                  return
+                }
                 saveResult(
                   {
                     exam_group_id: formData.exam_group_id,
@@ -265,9 +329,13 @@ export function ExamResultsPage() {
                     total_marks: Number(formData.total_marks),
                   },
                   editRow?._id
-                )
-                setAddOpen(false)
-                setEditRow(null)
+                ).then(() => {
+                  setAddOpen(false)
+                  setEditRow(null)
+                  setValidationError('')
+                }).catch((error) => {
+                  setValidationError(error.message || 'Failed to save result')
+                })
               }}
             >
               {editRow ? 'Update' : 'Save'}
@@ -276,10 +344,14 @@ export function ExamResultsPage() {
         }
       >
         <div className="space-y-4">
+          {validationError && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 rounded-md text-sm">
+              {validationError}
+            </div>
+          )}
           <div>
-            <Label>Student ID</Label>
-            <Input
-              placeholder="Enter student ID"
+            <Label>Student</Label>
+            <select
               value={formData.student_id}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -287,7 +359,25 @@ export function ExamResultsPage() {
                   student_id: e.target.value,
                 }))
               }
-            />
+              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Select student</option>
+              {students.map((s) => {
+                const studentName = s.name?.first && s.name?.last 
+                  ? `${s.name.first} ${s.name.last}`
+                  : s.first_name && s.last_name
+                  ? `${s.first_name} ${s.last_name}`
+                  : 'Unknown'
+                const className = s.class_name || s.class_id || 'N/A'
+                const section = s.section || ''
+                const classSection = section ? `${className} - ${section}` : className
+                return (
+                  <option key={getId(s)} value={getId(s)}>
+                    {studentName} ({classSection})
+                  </option>
+                )
+              })}
+            </select>
           </div>
           <div>
             <Label>Exam Group</Label>

@@ -371,6 +371,16 @@ export function useCurrencies() {
 
   const rows = data || []
 
+  // Initialize base currency from localStorage on load
+  useEffect(() => {
+    if (rows.length > 0) {
+      const baseCurrency = rows.find(c => c.is_base)
+      if (baseCurrency?.code) {
+        localStorage.setItem('baseCurrency', baseCurrency.code)
+      }
+    }
+  }, [rows])
+
   const filtered = useMemo(() => rows.filter((c) => {
     const q = search.toLowerCase()
     return !q || (c.code || '').toLowerCase().includes(q) || (c.currency_name || '').toLowerCase().includes(q)
@@ -395,9 +405,14 @@ export function useCurrencies() {
 
   const setBaseCurrency = useCallback(async (id) => {
     await settingsService.setBaseCurrency(id)
+    // Save base currency code to localStorage for use in formatCurrency
+    const currency = rows.find(c => c._id === id)
+    if (currency?.code) {
+      localStorage.setItem('baseCurrency', currency.code)
+    }
     toast({ title: 'Base currency set' })
     refetch()
-  }, [refetch, toast])
+  }, [refetch, toast, rows])
 
   const updateCurrencyStatus = useCallback(async (id, status) => {
     await settingsService.updateCurrencyStatus(id, status)

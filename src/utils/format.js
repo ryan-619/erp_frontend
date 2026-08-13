@@ -22,11 +22,16 @@ export function formatNumber(value) {
 }
 
 // Formats a numeric amount as currency, dropping cents for compactness in tables.
-export function formatCurrency(value, currency = 'USD') {
+// Uses the base currency from settings if available, otherwise defaults to USD.
+export function formatCurrency(value, currency = null) {
   if (value == null) return '—'
+  
+  // Try to get base currency from localStorage (set by CurrencySettingsPage)
+  const baseCurrency = currency || localStorage.getItem('baseCurrency') || 'USD'
+  
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: baseCurrency,
     maximumFractionDigits: 0,
   }).format(value)
 }

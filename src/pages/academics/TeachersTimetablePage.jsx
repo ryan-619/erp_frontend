@@ -35,6 +35,7 @@ export default function TeachersTimetablePage() {
   const { toast } = useToast()
   const [teacherOptions, setTeacherOptions] = useState([])
   const [selectedTeacherId, setSelectedTeacherId] = useState('')
+  const [currentDate, setCurrentDate] = useState(new Date())
 
   const teachersResult = useAsyncData(() => hrService.getStaff(), [])
   const subjectsResult = useAsyncData(() => academicsService.subjects(), [])
@@ -46,6 +47,10 @@ export default function TeachersTimetablePage() {
     setTeacherOptions(teachers)
     if (teachers.length && !selectedTeacherId) setSelectedTeacherId(teachers[0]?._id || '')
   }, [teachersResult.data])
+
+  useEffect(() => {
+    setCurrentDate(new Date())
+  }, [])
 
   const { data: timetableData, isLoading } = useAsyncData(
     () => selectedTeacherId ? academicsService.teacherTimetable(selectedTeacherId) : Promise.resolve([]),
@@ -72,18 +77,15 @@ export default function TeachersTimetablePage() {
     return section ? section.section_name : 'Unknown'
   }
 
-  // Dynamically extract unique days and periods from the timetable data
+  // Fixed days of the week - always show all 6 days (no Sunday)
   const weekDays = useMemo(() => {
-    const uniqueDays = [...new Set(timetable.map(e => e.day))].filter(Boolean)
-    // Sort days in proper order
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    return uniqueDays.sort((a, b) => dayOrder.indexOf(a) - dayOrder.indexOf(b))
-  }, [timetable])
+    return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  }, [])
 
+  // Fixed periods - always show all 8 periods
   const periods = useMemo(() => {
-    const uniquePeriods = [...new Set(timetable.map(e => e.period))].filter(p => p !== undefined && p !== null)
-    return uniquePeriods.sort((a, b) => a - b).map(p => ({ id: p, label: `Period ${p}` }))
-  }, [timetable])
+    return Array.from({ length: 8 }, (_, i) => ({ id: i + 1, label: `Period ${i + 1}` }))
+  }, [])
 
   const getEntryForDayAndPeriod = (day, period) => {
     // Only match entries that have both day and period
@@ -92,7 +94,7 @@ export default function TeachersTimetablePage() {
 
   const stats = useMemo(() => {
     const scheduled = timetable.length
-    const totalPeriods = periods.length * weekDays.length
+    const totalPeriods = 48 // Fixed: 8 periods x 6 days (no Sunday)
     const free = totalPeriods - scheduled
     const uniqueSubjects = new Set(timetable.map(e => e.subject_id)).size
     return {
@@ -101,7 +103,7 @@ export default function TeachersTimetablePage() {
       free: Math.max(0, free),
       subjects: uniqueSubjects,
     }
-  }, [timetable, periods, weekDays])
+  }, [timetable])
 
   const handlePrint = () => window.print()
   const handleExportPdf = () => {
@@ -135,31 +137,39 @@ export default function TeachersTimetablePage() {
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-lg font-bold text-primary border-2 border-primary/10">
-                {teacher?.name ? (
-                  <span>{teacher.name.charAt(0)}</span>
-                ) : (
-                  <User className="h-6 w-6 text-primary/60" />
-                )}
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-foreground">{teacher?.name || 'Select a teacher'}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  {teacher?.department && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-xs font-medium text-primary">
-                      {teacher.department}
-                    </span>
-                  )}
-                  {teacher?.designation && (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-xs font-medium text-muted-foreground">
-                      {teacher.designation}
-                    </span>
-                  )}
-                  {!teacher?.department && !teacher?.designation && (
-                    <span className="text-xs text-muted-foreground">No department/designation assigned</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-lg font-bold text-primary border-2 border-primary/10">
+                  {teacher?.name ? (
+                    <span>{teacher.name.charAt(0)}</span>
+                  ) : (
+                    <User className="h-6 w-6 text-primary/60" />
                   )}
                 </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-foreground">{teacher?.name || 'Select a teacher'}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    {teacher?.department && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 text-xs font-medium text-primary">
+                        {teacher.department}
+                      </span>
+                    )}
+                    {teacher?.designation && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-xs font-medium text-muted-foreground">
+                        {teacher.designation}
+                      </span>
+                    )}
+                    {!teacher?.department && !teacher?.designation && (
+                      <span className="text-xs text-muted-foreground">No department/designation assigned</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-muted-foreground">Current Date</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {currentDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </p>
               </div>
             </div>
             <div className="border-t pt-4">
@@ -194,12 +204,12 @@ export default function TeachersTimetablePage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b bg-muted/40">
-                    <th className="sticky left-0 z-10 bg-muted/40 p-3 text-left text-xs font-semibold text-muted-foreground">
+                    <th className="sticky left-0 z-10 bg-muted/40 p-3 text-left text-xs font-semibold text-muted-foreground border-r">
                       Period / Day
                     </th>
                     {weekDays.map((day) => (
-                      <th key={day} className="min-w-[140px] p-3 text-center text-xs font-semibold text-foreground">
-                        {day}
+                      <th key={day} className="min-w-[130px] p-3 text-center text-xs font-semibold text-foreground border-r last:border-r-0">
+                        {day.substring(0, 3).toUpperCase()}
                       </th>
                     ))}
                   </tr>

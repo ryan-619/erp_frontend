@@ -284,6 +284,37 @@ export function useExamResults() {
   const saveResult = useCallback(
     async (payload, id) => {
       try {
+        // Validate marks before saving
+        const marksObtained = Number(payload.marks_obtained)
+        const totalMarks = Number(payload.total_marks)
+        
+        if (marksObtained > totalMarks) {
+          toast({
+            title: 'Validation Error',
+            description: 'Marks obtained cannot exceed total marks',
+            variant: 'destructive',
+          })
+          throw new Error('Marks obtained cannot exceed total marks')
+        }
+        
+        if (marksObtained < 0) {
+          toast({
+            title: 'Validation Error',
+            description: 'Marks obtained cannot be negative',
+            variant: 'destructive',
+          })
+          throw new Error('Marks obtained cannot be negative')
+        }
+        
+        if (totalMarks <= 0) {
+          toast({
+            title: 'Validation Error',
+            description: 'Total marks must be greater than 0',
+            variant: 'destructive',
+          })
+          throw new Error('Total marks must be greater than 0')
+        }
+        
         if (id) {
           await examinationService.updateResult(id, payload)
           toast({ title: 'Result updated successfully' })
@@ -294,11 +325,15 @@ export function useExamResults() {
 
         await refetch()
       } catch (error) {
-        console.error('Failed to save exam result:', error)
-        toast({
-          title: 'Failed to save result',
-          variant: 'destructive',
-        })
+        if (error.message !== 'Marks obtained cannot exceed total marks' && 
+            error.message !== 'Marks obtained cannot be negative' && 
+            error.message !== 'Total marks must be greater than 0') {
+          toast({
+            title: 'Failed to save result',
+            description: error.message || 'An error occurred',
+            variant: 'destructive',
+          })
+        }
         throw error
       }
     },
@@ -316,8 +351,6 @@ export function useExamResults() {
 
         await refetch()
       } catch (error) {
-        console.error('Failed to delete exam result:', error)
-
         toast({
           title: 'Failed to delete result',
           variant: 'destructive',

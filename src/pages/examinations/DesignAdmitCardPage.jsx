@@ -3,10 +3,10 @@
 // Page: Design Admit Card
 //
 // Purpose: Visual builder for admit card template with live preview.
-// Payload Schema: { header, school_logo }
+// Payload Schema: { header, school_logo, template_config }
 // ====================================================================
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { IdCard, RotateCcw, Printer, Download, Save, Upload, Trash2, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,30 +15,38 @@ import Breadcrumbs from '@/components/breadcrumbs/Breadcrumbs'
 import { PageHeader } from '@/components/PageHeader'
 import { FormSection } from '@/components/FormSection'
 import { examinationService } from '@/services/examination.service'
+import { useAsyncData } from '@/hooks/useAsyncData'
 import { useToast } from '@/hooks/use-toast'
 
 const INITIAL_FORM = {
-  header: 'ABC PUBLIC SCHOOL',
+  header: '',
   school_logo: '',
+  template_config: {}
 }
-
-const ADMIT_CARD_DETAILS = [
-  { label: 'Admission No', val: '10234' },
-  { label: 'Roll No', val: '18' },
-  { label: 'Student Name', val: 'Rahul Sharma' },
-  { label: 'Father Name', val: 'Rajesh Sharma' },
-  { label: 'Class', val: 'X-A' },
-  { label: 'Exam Group', val: 'Annual Exam 2026' },
-  { label: 'Reporting Time', val: '08:30 AM' },
-  { label: 'Exam Time', val: '09:00 AM' },
-  { label: 'Exam Hall / Room', val: 'Hall A (Room 102)' },
-]
 
 export default function DesignAdmitCardPage() {
   const { toast } = useToast()
   const fileInputRef = useRef(null)
   const [form, setForm] = useState(INITIAL_FORM)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Fetch existing template from backend
+  const { data: templateData, isLoading, refetch } = useAsyncData(
+    () => examinationService.getAdmitCardDesigns(),
+    []
+  )
+
+  // Load existing template data
+  useEffect(() => {
+    if (templateData?.data && templateData.data.length > 0) {
+      const existingTemplate = templateData.data[0]
+      setForm({
+        header: existingTemplate.header || '',
+        school_logo: existingTemplate.school_logo || '',
+        template_config: existingTemplate.template_config || {}
+      })
+    }
+  }, [templateData])
 
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0]
@@ -66,13 +74,20 @@ export default function DesignAdmitCardPage() {
       const payload = {
         header: form.header.trim(),
         school_logo: form.school_logo.trim(),
+        template_config: form.template_config
       }
-      if (examinationService.updateAdmitCardTemplate) {
-        await examinationService.updateAdmitCardTemplate(payload)
-      } else if (examinationService.createAdmitCardDesign) {
+      
+      // Check if template exists and update, otherwise create new
+      if (templateData?.data && templateData.data.length > 0) {
+        const existingId = templateData.data[0]._id || templateData.data[0].id
+        await examinationService.updateAdmitCardTemplate(existingId, payload)
+        toast({ title: '✓ Admit Card Template Updated Successfully' })
+      } else {
         await examinationService.createAdmitCardDesign(payload)
+        toast({ title: '✓ Admit Card Template Created Successfully' })
       }
-      toast({ title: '✓ Admit Card Template Saved Successfully' })
+      
+      await refetch()
     } catch (error) {
       toast({
         title: 'Save Failed',
@@ -158,7 +173,7 @@ export default function DesignAdmitCardPage() {
                 <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-2.5">
                   <div className="flex items-center gap-3">
                     <img src={form.school_logo} alt="Logo Preview" className="h-9 w-9 object-contain rounded border bg-white p-0.5" />
-                    <span className="text-xs font-medium text-emerald-600">✓ logo.png uploaded</span>
+                    <span className="text-xs font-medium text-emerald-600">✓ logo uploaded</span>
                   </div>
                   <Button
                     type="button"
@@ -188,6 +203,7 @@ export default function DesignAdmitCardPage() {
         <div className="lg:col-span-7 space-y-3">
           <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
             <span>Live Preview</span>
+            {isLoading && <span className="text-muted-foreground/50">Loading template...</span>}
           </div>
 
           <div className="overflow-y-auto max-h-[85vh] p-4 bg-slate-100 dark:bg-slate-900/50 rounded-xl border flex justify-center">
@@ -218,12 +234,42 @@ export default function DesignAdmitCardPage() {
               <div className="grid grid-cols-12 gap-4 items-start">
                 {/* Details Grid */}
                 <div className="col-span-8 border border-gray-300 bg-gray-50 rounded p-3 text-xs space-y-1.5">
-                  {ADMIT_CARD_DETAILS.map((info) => (
-                    <div key={info.label} className="flex justify-between border-b border-gray-200 pb-1 last:border-b-0 last:pb-0">
-                      <span className="font-semibold text-gray-600">{info.label} :</span>
-                      <span className="font-bold text-black text-right">{info.val}</span>
-                    </div>
-                  ))}
+                  <div className="flex justify-between border-b border-gray-200 pb-1">
+                    <span className="font-semibold text-gray-600">Admission No :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-1">
+                    <span className="font-semibold text-gray-600">Roll No :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-1">
+                    <span className="font-semibold text-gray-600">Student Name :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-1">
+                    <span className="font-semibold text-gray-600">Father Name :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-1">
+                    <span className="font-semibold text-gray-600">Class :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-1">
+                    <span className="font-semibold text-gray-600">Exam Group :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-1">
+                    <span className="font-semibold text-gray-600">Reporting Time :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-1">
+                    <span className="font-semibold text-gray-600">Exam Time :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
+                  <div className="flex justify-between border-b border-gray-200 pb-1 last:border-b-0 last:pb-0">
+                    <span className="font-semibold text-gray-600">Exam Hall / Room :</span>
+                    <span className="font-bold text-black text-right">---</span>
+                  </div>
                 </div>
 
                 {/* Candidate Photo Box */}

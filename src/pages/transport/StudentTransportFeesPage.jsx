@@ -33,7 +33,7 @@ import { NoData } from '@/components/NoData'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { transportService } from '@/services/transport.service'
 import { studentService } from '@/services/student.service'
-import { formatDate } from '@/utils/format'
+import { formatCurrency, formatDate } from '@/utils/format'
 import { useToast } from '@/hooks/use-toast'
 
 const EXPORT_COLS = [
@@ -130,7 +130,7 @@ export default function StudentTransportFeesPage() {
         )
       },
     },
-    { accessorKey: 'fees_amount', header: 'Fees Amount', cell: ({ row }) => `$${row.original.fees_amount || 0}` },
+    { accessorKey: 'fees_amount', header: 'Fees Amount', cell: ({ row }) => formatCurrency(row.original.fees_amount) },
     { accessorKey: 'createdAt', header: 'Created', cell: ({ row }) => formatDate(row.original.createdAt) },
   ], [allStudents, allRoutes, allPickupPoints])
 
@@ -183,7 +183,7 @@ export default function StudentTransportFeesPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <StatCard label="Total Students" value={stats.total} icon={User} accent="primary" />
-        <StatCard label="Total Fees" value={`$${stats.totalFees}`} icon={DollarSign} accent="success" />
+        <StatCard label="Total Fees" value={formatCurrency(stats.totalFees)} icon={DollarSign} accent="success" />
       </div>
 
       <FilterBar>
@@ -262,7 +262,7 @@ export default function StudentTransportFeesPage() {
                 { label: 'Student', value: studentName },
                 { label: 'Route', value: route?.route_name || 'Unknown' },
                 { label: 'Pickup Point', value: point?.point_name || 'Unknown' },
-                { label: 'Fees Amount', value: `$${viewRow.fees_amount || 0}` },
+                { label: 'Fees Amount', value: formatCurrency(viewRow.fees_amount) },
                 { label: 'Created', value: formatDate(viewRow.createdAt) },
                 { label: 'Updated', value: formatDate(viewRow.updatedAt) },
               ].map((f) => (

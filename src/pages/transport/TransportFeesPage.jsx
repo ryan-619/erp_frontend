@@ -32,7 +32,7 @@ import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { NoData } from '@/components/NoData'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { transportService } from '@/services/transport.service'
-import { formatDate } from '@/utils/format'
+import { formatCurrency, formatDate } from '@/utils/format'
 import { useToast } from '@/hooks/use-toast'
 
 const EXPORT_COLS = [
@@ -84,7 +84,7 @@ export default function TransportFeesPage() {
         )
       },
     },
-    { accessorKey: 'amount', header: 'Amount', cell: ({ row }) => `$${row.original.amount || 0}` },
+    { accessorKey: 'amount', header: 'Amount', cell: ({ row }) => formatCurrency(row.original.amount) },
     { accessorKey: 'createdAt', header: 'Created', cell: ({ row }) => formatDate(row.original.createdAt) },
   ], [allRoutes])
 
@@ -137,7 +137,7 @@ export default function TransportFeesPage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <StatCard label="Total Routes with Fees" value={stats.total} icon={RouteIcon} accent="primary" />
-        <StatCard label="Total Amount" value={`$${stats.totalAmount}`} icon={DollarSign} accent="success" />
+        <StatCard label="Total Amount" value={formatCurrency(stats.totalAmount)} icon={DollarSign} accent="success" />
       </div>
 
       <FilterBar>
@@ -197,7 +197,7 @@ export default function TransportFeesPage() {
             <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               {[
                 { label: 'Route', value: route?.route_name || 'Unknown' },
-                { label: 'Amount', value: `$${viewRow.amount || 0}` },
+                { label: 'Amount', value: formatCurrency(viewRow.amount) },
                 { label: 'Created', value: formatDate(viewRow.createdAt) },
                 { label: 'Updated', value: formatDate(viewRow.updatedAt) },
               ].map((f) => (
