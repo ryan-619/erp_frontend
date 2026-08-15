@@ -7,6 +7,7 @@ import { sidebarItems } from '@/config/sidebar'
 import { useAuth } from '@/context/AuthContext'
 import { useModules } from '@/context/ModuleContext'
 import { ROLE_SIDEBAR } from '@/constants/navigation'
+import { fullName } from '@/utils/format'
 
 const EXPANDED_KEY = 'scholaria.sidebar.expanded'
 
@@ -27,6 +28,7 @@ function readExpanded() {
 // Maps sidebar section ids to backend module_name values for filtering.
 const SECTION_TO_MODULE = {
   dashboard: 'Dashboard',
+  'my-profile': 'Students',
   students: 'Students',
   academics: 'Academics',
   attendance: 'Attendance',
@@ -44,24 +46,14 @@ const SECTION_TO_MODULE = {
   users: 'Users',
   schools: 'Schools',
   domains: 'Domains',
+  notifications: 'Notifications',
 }
-
-const getDisplayName = (name) => {
-  if (typeof name === 'string') return name
-
-  if (name && typeof name === 'object') {
-    return [name.first, name.last].filter(Boolean).join(' ')
-  }
-
-  return 'User'
-}
-
 
 export function Sidebar({ collapsed, onNavigate }) {
   const location = useLocation()
   const { tenant, user, role } = useAuth()
 
-  const displayName = getDisplayName(user?.name)
+  const displayName = fullName(user?.name)
 
   const initials = displayName
     .split(' ')
@@ -121,12 +113,16 @@ export function Sidebar({ collapsed, onNavigate }) {
     return sidebarItems.filter((item) => {
       // Role filter: skip sections not allowed for this role.
       if (allowedSections && !allowedSections.has(item.id)) return false
+      
+      // Check item-specific role restrictions
+      if (item.roles && !item.roles.includes(role)) return false
+      
       const moduleName = SECTION_TO_MODULE[item.id]
       if (moduleName && !isModuleEnabled(moduleName)) return false
      if (moduleName && !hasPermission(moduleName, "view")) return false
       return true
     })
-  }, [isModuleEnabled, hasPermission, allowedSections])
+  }, [isModuleEnabled, hasPermission, allowedSections, role])
 
   // Tenant display: logo + school name from backend settings.
   const tenantName = tenant?.school_name || APP_NAME
@@ -201,10 +197,16 @@ export function Sidebar({ collapsed, onNavigate }) {
               (c) => location.pathname === c.path || location.pathname.startsWith(c.path + '/'),
             )
 
-            // Filter children by permission.
-            const visibleChildren = (item.children || []).filter((child) =>
-              hasPermission(item.id, 'view'),
-            )
+            // Filter children by permission and role.
+            const visibleChildren = (item.children || []).filter((child) => {
+              // Check permission
+              if (!hasPermission(item.id, 'view')) return false
+              
+              // Check role restrictions
+              if (child.roles && !child.roles.includes(role)) return false
+              
+              return true
+            })
 
             return (
               <li key={item.id}>

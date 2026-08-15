@@ -30,11 +30,13 @@ import AuthLayout from '@/layouts/AuthLayout'
 import ProtectedRoute from '@/routes/ProtectedRoute'
 import PublicRoute from '@/routes/PublicRoute'
 import PageLoader from '@/components/loaders/PageLoader'
+import { useAuth } from '@/context/AuthContext'
 
 
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
 const SignupPage = lazy(() => import('@/pages/auth/SignupPage'))
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'))
+const StudentDashboardPage = lazy(() => import('@/pages/student/StudentDashboardPage'))
 const SchoolsPage = lazy(() => import('@/pages/schools/SchoolsPage'))
 const CollegesPage = lazy(() => import('@/pages/colleges/CollegesPage'))
 const DomainsPage = lazy(() => import('@/pages/domains/DomainsPage'))
@@ -54,6 +56,7 @@ const ClassTimetablePage = lazy(() => import('@/pages/academics/ClassTimetablePa
 const TeachersTimetablePage = lazy(() => import('@/pages/academics/TeachersTimetablePage'))
 const StudentAttendancePage = lazy(() => import('@/pages/attendance/StudentAttendancePage'))
 const ApproveLeavePage = lazy(() => import('@/pages/attendance/ApproveLeavePage'))
+const StudentLeaveApplication = lazy(() => import('@/pages/attendance/StudentLeaveApplication'))
 const AttendanceByDatePage = lazy(() => import('@/pages/attendance/AttendanceByDatePage'))
 const ExamGroupsPage = lazy(() => import('@/pages/examinations/ExamGroupsPage'))
 const ExamSchedulePage = lazy(() => import('@/pages/examinations/ExamSchedulePage'))
@@ -156,6 +159,9 @@ const DailyAssignmentPage = lazy(() => import('@/pages/homework/DailyAssignmentP
 const LessonPage = lazy(() => import('@/pages/lesson-plan/LessonPage'))
 const TopicPage = lazy(() => import('@/pages/lesson-plan/TopicPage'))
 const ManageLessonPlanPage = lazy(() => import('@/pages/lesson-plan/ManageLessonPlanPage'))
+const MyLessonsPage = lazy(() => import('@/pages/student/MyLessonsPage'))
+const MyTopicsPage = lazy(() => import('@/pages/student/MyTopicsPage'))
+const MyLessonPlansPage = lazy(() => import('@/pages/student/MyLessonPlansPage'))
 
 // Alumni module — lazy-loaded so the bundle only downloads when a user visits Alumni pages
 const ManageAlumniPage = lazy(() => import('@/pages/alumni/ManageAlumniPage'))
@@ -178,6 +184,7 @@ const IssueItemPage = lazy(() => import('@/pages/inventory/IssueItemPage'))
 // Online Exam module — lazy-loaded so the bundle only downloads when a user visits Online Exam pages
 const OnlineExamsPage = lazy(() => import('@/pages/online-exam/OnlineExamsPage'))
 const QuestionBankPage = lazy(() => import('@/pages/online-exam/QuestionBankPage'))
+const MyOnlineExamsPage = lazy(() => import('@/pages/student/MyOnlineExamsPage'))
 
 // Certificate module — lazy-loaded so the bundle only downloads when a user visits Certificate pages
 const StudentCertificatePage = lazy(() => import('@/pages/certificate/StudentCertificatePage'))
@@ -214,8 +221,128 @@ const CustomFieldPage = lazy(() => import('@/pages/settings/CustomFieldPage'))
 const SystemFieldPage = lazy(() => import('@/pages/settings/SystemFieldPage'))
 const FileTypePage = lazy(() => import('@/pages/settings/FileTypePage'))
 
+// Student Portal pages
+const MyProfilePage = lazy(() => import('@/pages/student/MyProfilePage'))
+const MyAttendancePage = lazy(() => import('@/pages/student/MyAttendancePage'))
+const StudentApplyLeavePage = lazy(() => import('@/pages/student/StudentApplyLeavePage'))
+const MyLeaveRequestsPage = lazy(() => import('@/pages/student/MyLeaveRequestsPage'))
+const StudentClassTimetablePage = lazy(() => import('@/pages/student/StudentClassTimetablePage'))
+const StudentTeacherTimetablePage = lazy(() => import('@/pages/student/StudentTeacherTimetablePage'))
+const StudentExamSchedulePage = lazy(() => import('@/pages/student/StudentExamSchedulePage'))
+const MyResultsPage = lazy(() => import('@/pages/student/MyResultsPage'))
+const MyMarksheetPage = lazy(() => import('@/pages/student/MyMarksheetPage'))
+const MyAdmitCardPage = lazy(() => import('@/pages/student/MyAdmitCardPage'))
+const DueFeesPage = lazy(() => import('@/pages/student/DueFeesPage'))
+const PaymentHistoryPage = lazy(() => import('@/pages/student/PaymentHistoryPage'))
+const MyHomeworkPage = lazy(() => import('@/pages/student/MyHomeworkPage'))
+const StudentDailyAssignmentPage = lazy(() => import('@/pages/student/StudentDailyAssignmentPage'))
+const SharedContentPage = lazy(() => import('@/pages/student/SharedContentPage'))
+const StudentVideoTutorialsPage = lazy(() => import('@/pages/student/StudentVideoTutorialsPage'))
+const StudentBooksPage = lazy(() => import('@/pages/student/StudentBooksPage'))
+const MyLibraryPage = lazy(() => import('@/pages/student/MyLibraryPage'))
+const MyTransportPage = lazy(() => import('@/pages/student/MyTransportPage'))
+const MyCertificatesPage = lazy(() => import('@/pages/student/MyCertificatesPage'))
+const MyIDCardPage = lazy(() => import('@/pages/student/MyIDCardPage'))
+const NotificationsPage = lazy(() => import('@/pages/student/NotificationsPage'))
+
 const NotFoundPage = lazy(() => import('@/pages/errors/NotFoundPage'))
 const ForbiddenPage = lazy(() => import('@/pages/errors/ForbiddenPage'))
+
+// Role-based access control wrapper for Attendance approve-leave
+function ApproveLeavePageWrapper() {
+  const { role } = useAuth()
+  const allowedRoles = ['admin', 'staff', 'superadmin']
+
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return <ApproveLeavePage />
+}
+
+// Role-based access control wrapper for HR approve-leave
+function ApproveLeaveHRPageWrapper() {
+  const { role } = useAuth()
+  const allowedRoles = ['admin', 'superadmin']
+
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return <ApproveLeaveHRPage />
+}
+
+// Role-based wrapper for Class Timetable - students see student version
+function ClassTimetableWrapper() {
+  const { role } = useAuth()
+  if (role === 'student') {
+    return <StudentClassTimetablePage />
+  }
+  return <ClassTimetablePage />
+}
+
+// Role-based wrapper for Teacher Timetable - students see student version
+function TeacherTimetableWrapper() {
+  const { role } = useAuth()
+  if (role === 'student') {
+    return <StudentTeacherTimetablePage />
+  }
+  return <TeachersTimetablePage />
+}
+
+// Role-based wrapper for Exam Schedule - students see student version
+function ExamScheduleWrapper() {
+  const { role } = useAuth()
+  if (role === 'student') {
+    return <StudentExamSchedulePage />
+  }
+  return <ExamSchedulePage />
+}
+
+// Role-based wrapper for Homework/Daily Assignment - students see student version
+function DailyAssignmentWrapper() {
+  const { role } = useAuth()
+  if (role === 'student') {
+    return <StudentDailyAssignmentPage />
+  }
+  return <DailyAssignmentPage />
+}
+
+// Role-based wrapper for Video Tutorials - students see student version
+function VideoTutorialsWrapper() {
+  const { role } = useAuth()
+  if (role === 'student') {
+    return <StudentVideoTutorialsPage />
+  }
+  return <VideoTutorialsPage />
+}
+
+// Role-based wrapper for Library Books - students see student version
+function LibraryBooksWrapper() {
+  const { role } = useAuth()
+  if (role === 'student') {
+    return <StudentBooksPage />
+  }
+  return <BookListPage />
+}
+
+// Student Route Protection - prevents students from accessing administrative routes
+function StudentProtectedRoute({ children, allowedRoles = ['superadmin', 'admin', 'staff'] }) {
+  const { role } = useAuth()
+  if (role === 'student') {
+    return <Navigate to="/dashboard" replace />
+  }
+  return children
+}
+
+// Role-based wrapper for Dashboard - students see student dashboard
+function DashboardWrapper() {
+  const { role } = useAuth()
+  if (role === 'student') {
+    return <StudentDashboardPage />
+  }
+  return <DashboardPage />
+}
 
 export default function AppRouter() {
   return (
@@ -253,195 +380,217 @@ export default function AppRouter() {
             }
           >
           {/* ── Core modules ── */}
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardWrapper />} />
             {/* Role-specific dashboard routes (post-login redirect targets) */}
             <Route path="/admin/dashboard" element={<DashboardPage />} />
             <Route path="/staff/dashboard" element={<DashboardPage />} />
-            <Route path="/student/dashboard" element={<DashboardPage />} />
+            <Route path="/student/dashboard" element={<DashboardWrapper />} />
             <Route path="/parent/dashboard" element={<DashboardPage />} />
-            <Route path="/schools" element={<SchoolsPage />} />
-            <Route path="/colleges" element={<CollegesPage />} />
-            <Route path="/domains" element={<DomainsPage />} />
-            <Route path="/students" element={<StudentsPage />} />
+            <Route path="/schools" element={<StudentProtectedRoute><SchoolsPage /></StudentProtectedRoute>} />
+            <Route path="/colleges" element={<StudentProtectedRoute><CollegesPage /></StudentProtectedRoute>} />
+            <Route path="/domains" element={<StudentProtectedRoute><DomainsPage /></StudentProtectedRoute>} />
+            <Route path="/students" element={<StudentProtectedRoute><StudentsPage /></StudentProtectedRoute>} />
             <Route path="/students/profile" element={<Navigate to="/students" replace />} />
-            <Route path="/students/profile/:id" element={<StudentProfilePage />} />
-            <Route path="/students/admissions" element={<AdmissionsPage />} />
-            <Route path="/students/categories" element={<StudentCategoriesPage />} />
-            <Route path="/students/houses" element={<StudentHousesPage />} />
-            <Route path="/students/disabled" element={<DisabledStudentsPage />} />
-            <Route path="/students/multi-class" element={<MultiClassStudentsPage />} />
+            <Route path="/students/profile/:id" element={<StudentProtectedRoute><StudentProfilePage /></StudentProtectedRoute>} />
+            <Route path="/students/admissions" element={<StudentProtectedRoute><AdmissionsPage /></StudentProtectedRoute>} />
+            <Route path="/students/categories" element={<StudentProtectedRoute><StudentCategoriesPage /></StudentProtectedRoute>} />
+            <Route path="/students/houses" element={<StudentProtectedRoute><StudentHousesPage /></StudentProtectedRoute>} />
+            <Route path="/students/disabled" element={<StudentProtectedRoute><DisabledStudentsPage /></StudentProtectedRoute>} />
+            <Route path="/students/multi-class" element={<StudentProtectedRoute><MultiClassStudentsPage /></StudentProtectedRoute>} />
              
             
             <Route
             path="/students/disable-reasons"
-            element={<DisableReasonsPage />}
+            element={<StudentProtectedRoute><DisableReasonsPage /></StudentProtectedRoute>}
             />
 
             
 
             <Route
             path="/students/bulk-delete"
-            element={<BulkDeletePage />}
+            element={<StudentProtectedRoute><BulkDeletePage /></StudentProtectedRoute>}
             />
 
 
 
             
 
-            <Route path="/academics/classes" element={<ClassesPage />} />
-            <Route path="/academics/sections" element={<SectionsPage />} />
-            <Route path="/academics/subjects" element={<SubjectsPage />} />
-            <Route path="/academics/subject-groups" element={<SubjectGroupsPage />} />
-            <Route path="/academics/assign-class-teacher" element={<AssignClassTeacherPage />} />
-            <Route path="/academics/promote-students" element={<PromoteStudentsPage />} />
-            <Route path="/academics/timetable" element={<ClassTimetablePage />} />
-            <Route path="/academics/teachers-timetable" element={<TeachersTimetablePage />} />
+            <Route path="/academics/classes" element={<StudentProtectedRoute><ClassesPage /></StudentProtectedRoute>} />
+            <Route path="/academics/sections" element={<StudentProtectedRoute><SectionsPage /></StudentProtectedRoute>} />
+            <Route path="/academics/subjects" element={<StudentProtectedRoute><SubjectsPage /></StudentProtectedRoute>} />
+            <Route path="/academics/subject-groups" element={<StudentProtectedRoute><SubjectGroupsPage /></StudentProtectedRoute>} />
+            <Route path="/academics/assign-class-teacher" element={<StudentProtectedRoute><AssignClassTeacherPage /></StudentProtectedRoute>} />
+            <Route path="/academics/promote-students" element={<StudentProtectedRoute><PromoteStudentsPage /></StudentProtectedRoute>} />
+            <Route path="/academics/timetable" element={<ClassTimetableWrapper />} />
+            <Route path="/academics/teachers-timetable" element={<TeacherTimetableWrapper />} />
             <Route path="/attendance" element={<StudentAttendancePage />} />
-            <Route path="/attendance/approve-leave" element={<ApproveLeavePage />} />
-            <Route path="/attendance/by-date" element={<AttendanceByDatePage />} />
-            <Route path="/examinations/exam-groups" element={<ExamGroupsPage />} />
-            <Route path="/examinations/schedule" element={<ExamSchedulePage />} />
-            <Route path="/examinations/results" element={<ExamResultsPage />} />
-            <Route path="/examinations/design-admit-card" element={<DesignAdmitCardPage />} />
-            <Route path="/examinations/print-admit-card" element={<PrintAdmitCardPage />} />
-            <Route path="/examinations/design-marksheet" element={<DesignMarksheetPage />} />
-            <Route path="/examinations/print-marksheet" element={<PrintMarksheetPage />} />
-            <Route path="/examinations/marks-grade" element={<MarksGradePage />} />
-            <Route path="/examinations/marks-division" element={<MarksDivisionPage />} />
+            <Route path="/attendance/apply-leave" element={<StudentLeaveApplication />} />
+            <Route path="/attendance/approve-leave" element={<ApproveLeavePageWrapper />} />
+            <Route path="/attendance/by-date" element={<StudentProtectedRoute><AttendanceByDatePage /></StudentProtectedRoute>} />
+            <Route path="/examinations/exam-groups" element={<StudentProtectedRoute><ExamGroupsPage /></StudentProtectedRoute>} />
+            <Route path="/examinations/schedule" element={<ExamScheduleWrapper />} />
+            <Route path="/examinations/results" element={<StudentProtectedRoute><ExamResultsPage /></StudentProtectedRoute>} />
+            <Route path="/examinations/design-admit-card" element={<StudentProtectedRoute><DesignAdmitCardPage /></StudentProtectedRoute>} />
+            <Route path="/examinations/print-admit-card" element={<StudentProtectedRoute><PrintAdmitCardPage /></StudentProtectedRoute>} />
+            <Route path="/examinations/design-marksheet" element={<StudentProtectedRoute><DesignMarksheetPage /></StudentProtectedRoute>} />
+            <Route path="/examinations/print-marksheet" element={<StudentProtectedRoute><PrintMarksheetPage /></StudentProtectedRoute>} />
+            <Route path="/examinations/marks-grade" element={<StudentProtectedRoute><MarksGradePage /></StudentProtectedRoute>} />
+            <Route path="/examinations/marks-division" element={<StudentProtectedRoute><MarksDivisionPage /></StudentProtectedRoute>} />
 
-            <Route path="/fees/collect" element={<CollectFeesPage />} />
-            <Route path="/fees/search-payment" element={<SearchFeesPaymentPage />} />
-            <Route path="/fees/search-due" element={<SearchDueFeesPage />} />
-            <Route path="/fees/offline-payment" element={<OfflineBankPaymentPage />} />
-            <Route path="/fees/reminder" element={<FeesReminderPage />} />
-            <Route path="/fees/master" element={<FeesMasterPage />} />
-            <Route path="/fees/group" element={<FeesGroupPage />} />
-            <Route path="/fees/type" element={<FeesTypePage />} />
-            <Route path="/fees/discount" element={<FeesDiscountPage />} />
-            <Route path="/fees/carry-forward" element={<FeesCarryForwardPage />} />
-            <Route path="/users" element={<UsersPage />} />
-            <Route path="/users/roles" element={<RolesPage />} />
-            <Route path="/super-admin" element={<SuperAdminPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/fees/collect" element={<StudentProtectedRoute><CollectFeesPage /></StudentProtectedRoute>} />
+            <Route path="/fees/search-payment" element={<StudentProtectedRoute><SearchFeesPaymentPage /></StudentProtectedRoute>} />
+            <Route path="/fees/search-due" element={<StudentProtectedRoute><SearchDueFeesPage /></StudentProtectedRoute>} />
+            <Route path="/fees/offline-payment" element={<StudentProtectedRoute><OfflineBankPaymentPage /></StudentProtectedRoute>} />
+            <Route path="/fees/reminder" element={<StudentProtectedRoute><FeesReminderPage /></StudentProtectedRoute>} />
+            <Route path="/fees/master" element={<StudentProtectedRoute><FeesMasterPage /></StudentProtectedRoute>} />
+            <Route path="/fees/group" element={<StudentProtectedRoute><FeesGroupPage /></StudentProtectedRoute>} />
+            <Route path="/fees/type" element={<StudentProtectedRoute><FeesTypePage /></StudentProtectedRoute>} />
+            <Route path="/fees/discount" element={<StudentProtectedRoute><FeesDiscountPage /></StudentProtectedRoute>} />
+            <Route path="/fees/carry-forward" element={<StudentProtectedRoute><FeesCarryForwardPage /></StudentProtectedRoute>} />
+            <Route path="/users" element={<StudentProtectedRoute><UsersPage /></StudentProtectedRoute>} />
+            <Route path="/users/roles" element={<StudentProtectedRoute><RolesPage /></StudentProtectedRoute>} />
+            <Route path="/super-admin" element={<StudentProtectedRoute><SuperAdminPage /></StudentProtectedRoute>} />
+            <Route path="/settings" element={<StudentProtectedRoute><SettingsPage /></StudentProtectedRoute>} />
             <Route path="/profile" element={<ProfilePage />} />
 
             {/* ── Human Resources ── */}
-            <Route path="/hr/staff" element={<StaffDirectoryPage />} />
-            <Route path="/hr/attendance" element={<StaffAttendancePage />} />
-            <Route path="/hr/payroll" element={<PayrollPage />} />
-            <Route path="/hr/approve-leave" element={<ApproveLeaveHRPage />} />
-            <Route path="/hr/apply-leave" element={<ApplyLeavePage />} />
-            <Route path="/hr/leave-types" element={<LeaveTypesPage />} />
-            <Route path="/hr/teachers-rating" element={<TeachersRatingPage />} />
-            <Route path="/hr/departments" element={<DepartmentPage />} />
-            <Route path="/hr/designations" element={<DesignationPage />} />
-            <Route path="/hr/disabled-staff" element={<DisabledStaffPage />} />
+            <Route path="/hr/staff" element={<StudentProtectedRoute><StaffDirectoryPage /></StudentProtectedRoute>} />
+            <Route path="/hr/attendance" element={<StudentProtectedRoute><StaffAttendancePage /></StudentProtectedRoute>} />
+            <Route path="/hr/payroll" element={<StudentProtectedRoute><PayrollPage /></StudentProtectedRoute>} />
+            <Route path="/hr/approve-leave" element={<ApproveLeaveHRPageWrapper />} />
+            <Route path="/hr/apply-leave" element={<StudentProtectedRoute><ApplyLeavePage /></StudentProtectedRoute>} />
+            <Route path="/hr/leave-types" element={<StudentProtectedRoute><LeaveTypesPage /></StudentProtectedRoute>} />
+            <Route path="/hr/teachers-rating" element={<StudentProtectedRoute><TeachersRatingPage /></StudentProtectedRoute>} />
+            <Route path="/hr/departments" element={<StudentProtectedRoute><DepartmentPage /></StudentProtectedRoute>} />
+            <Route path="/hr/designations" element={<StudentProtectedRoute><DesignationPage /></StudentProtectedRoute>} />
+            <Route path="/hr/disabled-staff" element={<StudentProtectedRoute><DisabledStaffPage /></StudentProtectedRoute>} />
 
             {/* ── Front Office ── */}
-            <Route path="/front-office/enquiry" element={<AdmissionEnquiryPage />} />
-            <Route path="/front-office/visitor-book" element={<VisitorBookPage />} />
-            <Route path="/front-office/call-log" element={<PhoneCallLogPage />} />
-            <Route path="/front-office/dispatch" element={<PostalDispatchPage />} />
-            <Route path="/front-office/receive" element={<PostalReceivePage />} />
-            <Route path="/front-office/complaint" element={<ComplaintPage />} />
-            <Route path="/front-office/setup" element={<SetupFrontOfficePage />} />
+            <Route path="/front-office/enquiry" element={<StudentProtectedRoute><AdmissionEnquiryPage /></StudentProtectedRoute>} />
+            <Route path="/front-office/visitor-book" element={<StudentProtectedRoute><VisitorBookPage /></StudentProtectedRoute>} />
+            <Route path="/front-office/call-log" element={<StudentProtectedRoute><PhoneCallLogPage /></StudentProtectedRoute>} />
+            <Route path="/front-office/dispatch" element={<StudentProtectedRoute><PostalDispatchPage /></StudentProtectedRoute>} />
+            <Route path="/front-office/receive" element={<StudentProtectedRoute><PostalReceivePage /></StudentProtectedRoute>} />
+            <Route path="/front-office/complaint" element={<StudentProtectedRoute><ComplaintPage /></StudentProtectedRoute>} />
+            <Route path="/front-office/setup" element={<StudentProtectedRoute><SetupFrontOfficePage /></StudentProtectedRoute>} />
 
             {/* ── Library ── */}
-            <Route path="/library/books" element={<BookListPage />} />
-            <Route path="/library/issue-return" element={<IssueReturnPage />} />
-            <Route path="/library/add-book" element={<AddBookPage />} />
-            <Route path="/library/staff" element={<AddStaffMemberPage />} />
-            <Route path="/library/students" element={<LibraryStudentPage />} />
+            <Route path="/library/books" element={<LibraryBooksWrapper />} />
+            <Route path="/library/issue-return" element={<StudentProtectedRoute><IssueReturnPage /></StudentProtectedRoute>} />
+            <Route path="/library/add-book" element={<StudentProtectedRoute><AddBookPage /></StudentProtectedRoute>} />
+            <Route path="/library/staff" element={<StudentProtectedRoute><AddStaffMemberPage /></StudentProtectedRoute>} />
+            <Route path="/library/students" element={<StudentProtectedRoute><LibraryStudentPage /></StudentProtectedRoute>} />
 
             {/* ── Transport ── */}
-            <Route path="/transport/routes" element={<RoutesPage />} />
-            <Route path="/transport/vehicles" element={<VehiclesPage />} />
-            <Route path="/transport/pickup-points" element={<PickupPointsPage />} />
-            <Route path="/transport/assign-vehicle" element={<AssignVehiclePage />} />
-            <Route path="/transport/assign-pickup-point" element={<AssignPickupPointPage />} />
-            <Route path="/transport/fees" element={<TransportFeesPage />} />
-            <Route path="/transport/student-fees" element={<StudentTransportFeesPage />} />
+            <Route path="/transport/routes" element={<StudentProtectedRoute><RoutesPage /></StudentProtectedRoute>} />
+            <Route path="/transport/vehicles" element={<StudentProtectedRoute><VehiclesPage /></StudentProtectedRoute>} />
+            <Route path="/transport/pickup-points" element={<StudentProtectedRoute><PickupPointsPage /></StudentProtectedRoute>} />
+            <Route path="/transport/assign-vehicle" element={<StudentProtectedRoute><AssignVehiclePage /></StudentProtectedRoute>} />
+            <Route path="/transport/assign-pickup-point" element={<StudentProtectedRoute><AssignPickupPointPage /></StudentProtectedRoute>} />
+            <Route path="/transport/fees" element={<StudentProtectedRoute><TransportFeesPage /></StudentProtectedRoute>} />
+            <Route path="/transport/student-fees" element={<StudentProtectedRoute><StudentTransportFeesPage /></StudentProtectedRoute>} />
 
             {/* ── Hostel ── */}
-            <Route path="/hostel/hostels" element={<HostelListPage />} />
-            <Route path="/hostel/room-types" element={<RoomTypesPage />} />
-            <Route path="/hostel/rooms" element={<HostelRoomsPage />} />
+            <Route path="/hostel/hostels" element={<StudentProtectedRoute><HostelListPage /></StudentProtectedRoute>} />
+            <Route path="/hostel/room-types" element={<StudentProtectedRoute><RoomTypesPage /></StudentProtectedRoute>} />
+            <Route path="/hostel/rooms" element={<StudentProtectedRoute><HostelRoomsPage /></StudentProtectedRoute>} />
 
             {/* ── Income ── */}
-            <Route path="/income/head" element={<IncomeHeadPage />} />
-            <Route path="/income/add" element={<AddIncomePage />} />
-            <Route path="/income/search" element={<SearchIncomePage />} />
+            <Route path="/income/head" element={<StudentProtectedRoute><IncomeHeadPage /></StudentProtectedRoute>} />
+            <Route path="/income/add" element={<StudentProtectedRoute><AddIncomePage /></StudentProtectedRoute>} />
+            <Route path="/income/search" element={<StudentProtectedRoute><SearchIncomePage /></StudentProtectedRoute>} />
 
             {/* ── Expenses ── */}
-            <Route path="/expenses/head" element={<ExpenseHeadPage />} />
-            <Route path="/expenses/add" element={<AddExpensePage />} />
-            <Route path="/expenses/search" element={<SearchExpensePage />} />
+            <Route path="/expenses/head" element={<StudentProtectedRoute><ExpenseHeadPage /></StudentProtectedRoute>} />
+            <Route path="/expenses/add" element={<StudentProtectedRoute><AddExpensePage /></StudentProtectedRoute>} />
+            <Route path="/expenses/search" element={<StudentProtectedRoute><SearchExpensePage /></StudentProtectedRoute>} />
 
             {/* ── Homework ── */}
-            <Route path="/homework/add" element={<AddHomeworkPage />} />
-            <Route path="/homework/daily-assignment" element={<DailyAssignmentPage />} />
+            <Route path="/homework/add" element={<StudentProtectedRoute><AddHomeworkPage /></StudentProtectedRoute>} />
+            <Route path="/homework/daily-assignment" element={<DailyAssignmentWrapper />} />
 
             {/* ── Lesson Plan ── */}
-            <Route path="/lesson-plan/lessons" element={<LessonPage />} />
-            <Route path="/lesson-plan/topics" element={<TopicPage />} />
-            <Route path="/lesson-plan/lesson-plans" element={<ManageLessonPlanPage />} />
+            <Route path="/lesson-plan/lessons" element={<StudentProtectedRoute><LessonPage /></StudentProtectedRoute>} />
+            <Route path="/lesson-plan/topics" element={<StudentProtectedRoute><TopicPage /></StudentProtectedRoute>} />
+            <Route path="/lesson-plan/lesson-plans" element={<StudentProtectedRoute><ManageLessonPlanPage /></StudentProtectedRoute>} />
 
             {/* ── Alumni ── */}
-            <Route path="/alumni" element={<ManageAlumniPage />} />
-            <Route path="/alumni/events" element={<AlumniEventsPage />} />
+            <Route path="/alumni" element={<StudentProtectedRoute><ManageAlumniPage /></StudentProtectedRoute>} />
+            <Route path="/alumni/events" element={<StudentProtectedRoute><AlumniEventsPage /></StudentProtectedRoute>} />
 
             {/* ── Download Center ── */}
-            <Route path="/download-center/content-types" element={<ContentTypePage />} />
+            <Route path="/download-center/content-types" element={<StudentProtectedRoute><ContentTypePage /></StudentProtectedRoute>} />
             <Route path="/download-center/share-list" element={<ContentShareListPage />} />
-            <Route path="/download-center/contents" element={<UploadShareContentPage />} />
-            <Route path="/download-center/video-tutorials" element={<VideoTutorialsPage />} />
+            <Route path="/download-center/contents" element={<StudentProtectedRoute><UploadShareContentPage /></StudentProtectedRoute>} />
+            <Route path="/download-center/video-tutorials" element={<VideoTutorialsWrapper />} />
 
             {/* ── Inventory ── */}
-            <Route path="/inventory/categories" element={<ItemCategoryPage />} />
-            <Route path="/inventory/stores" element={<ItemStorePage />} />
-            <Route path="/inventory/suppliers" element={<ItemSupplierPage />} />
-            <Route path="/inventory/items" element={<ItemsPage />} />
-            <Route path="/inventory/stock" element={<ItemStockPage />} />
-            <Route path="/inventory/issue" element={<IssueItemPage />} />
+            <Route path="/inventory/categories" element={<StudentProtectedRoute><ItemCategoryPage /></StudentProtectedRoute>} />
+            <Route path="/inventory/stores" element={<StudentProtectedRoute><ItemStorePage /></StudentProtectedRoute>} />
+            <Route path="/inventory/suppliers" element={<StudentProtectedRoute><ItemSupplierPage /></StudentProtectedRoute>} />
+            <Route path="/inventory/items" element={<StudentProtectedRoute><ItemsPage /></StudentProtectedRoute>} />
+            <Route path="/inventory/stock" element={<StudentProtectedRoute><ItemStockPage /></StudentProtectedRoute>} />
+            <Route path="/inventory/issue" element={<StudentProtectedRoute><IssueItemPage /></StudentProtectedRoute>} />
 
             {/* ── Online Exam ── */}
             <Route path="/online-exam" element={<OnlineExamsPage />} />
-            <Route path="/online-exam/question-bank" element={<QuestionBankPage />} />
+            <Route path="/online-exam/question-bank" element={<StudentProtectedRoute><QuestionBankPage /></StudentProtectedRoute>} />
 
             {/* ── Certificate ── */}
-            <Route path="/certificate/student" element={<StudentCertificatePage />} />
-            <Route path="/certificate/generate" element={<GenerateCertificatePage />} />
-            <Route path="/certificate/student-id-card" element={<StudentIdCardPage />} />
-            <Route path="/certificate/generate-id-card" element={<GenerateStudentIdCardPage />} />
-            <Route path="/certificate/staff-id-card" element={<StaffIdCardPage />} />
-            <Route path="/certificate/generate-staff-id-card" element={<GenerateStaffIdCardPage />} />
+            <Route path="/certificate/student" element={<StudentProtectedRoute><StudentCertificatePage /></StudentProtectedRoute>} />
+            <Route path="/certificate/generate" element={<StudentProtectedRoute><GenerateCertificatePage /></StudentProtectedRoute>} />
+            <Route path="/certificate/student-id-card" element={<StudentProtectedRoute><StudentIdCardPage /></StudentProtectedRoute>} />
+            <Route path="/certificate/generate-id-card" element={<StudentProtectedRoute><GenerateStudentIdCardPage /></StudentProtectedRoute>} />
+            <Route path="/certificate/staff-id-card" element={<StudentProtectedRoute><StaffIdCardPage /></StudentProtectedRoute>} />
+            <Route path="/certificate/generate-staff-id-card" element={<StudentProtectedRoute><GenerateStaffIdCardPage /></StudentProtectedRoute>} />
 
             {/* ── Front CMS ── */}
-            <Route path="/front-cms/banners" element={<BannerPage />} />
-            <Route path="/front-cms/news" element={<NewsPage />} />
-            <Route path="/front-cms/events" element={<EventPage />} />
-            <Route path="/front-cms/gallery" element={<GalleryPage />} />
-            <Route path="/front-cms/media" element={<MediaManagerPage />} />
-            <Route path="/front-cms/pages" element={<PagePage />} />
-            <Route path="/front-cms/menus" element={<MenuPage />} />
+            <Route path="/front-cms/banners" element={<StudentProtectedRoute><BannerPage /></StudentProtectedRoute>} />
+            <Route path="/front-cms/news" element={<StudentProtectedRoute><NewsPage /></StudentProtectedRoute>} />
+            <Route path="/front-cms/events" element={<StudentProtectedRoute><EventPage /></StudentProtectedRoute>} />
+            <Route path="/front-cms/gallery" element={<StudentProtectedRoute><GalleryPage /></StudentProtectedRoute>} />
+            <Route path="/front-cms/media" element={<StudentProtectedRoute><MediaManagerPage /></StudentProtectedRoute>} />
+            <Route path="/front-cms/pages" element={<StudentProtectedRoute><PagePage /></StudentProtectedRoute>} />
+            <Route path="/front-cms/menus" element={<StudentProtectedRoute><MenuPage /></StudentProtectedRoute>} />
 
             {/* ── Settings ── */}
-            <Route path="/settings/dashboard" element={<SettingsDashboardPage />} />
-            <Route path="/settings/general" element={<GeneralSettingsPage />} />
-            <Route path="/settings/session" element={<SessionSettingsPage />} />
-            <Route path="/settings/roles" element={<RolePermissionPage />} />
-            <Route path="/settings/users" element={<UsersSettingsPage />} />
-            <Route path="/settings/notifications" element={<NotificationSettingsPage />} />
-            <Route path="/settings/sms" element={<SmsSettingsPage />} />
-            <Route path="/settings/payment" element={<PaymentSettingsPage />} />
-            <Route path="/settings/currency" element={<CurrencySettingsPage />} />
-            <Route path="/settings/language" element={<LanguageSettingsPage />} />
-            <Route path="/settings/captcha" element={<CaptchaSettingsPage />} />
-            <Route path="/settings/modules" element={<ModulesPage />} />
-            <Route path="/settings/front-cms" element={<FrontCmsSettingsPage />} />
-            <Route path="/settings/custom-fields" element={<CustomFieldPage />} />
-            <Route path="/settings/system-fields" element={<SystemFieldPage />} />
-            <Route path="/settings/file-types" element={<FileTypePage />} />
+            <Route path="/settings/dashboard" element={<StudentProtectedRoute><SettingsDashboardPage /></StudentProtectedRoute>} />
+            <Route path="/settings/general" element={<StudentProtectedRoute><GeneralSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/session" element={<StudentProtectedRoute><SessionSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/roles" element={<StudentProtectedRoute><RolePermissionPage /></StudentProtectedRoute>} />
+            <Route path="/settings/users" element={<StudentProtectedRoute><UsersSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/notifications" element={<StudentProtectedRoute><NotificationSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/sms" element={<StudentProtectedRoute><SmsSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/payment" element={<StudentProtectedRoute><PaymentSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/currency" element={<StudentProtectedRoute><CurrencySettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/language" element={<StudentProtectedRoute><LanguageSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/captcha" element={<StudentProtectedRoute><CaptchaSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/modules" element={<StudentProtectedRoute><ModulesPage /></StudentProtectedRoute>} />
+            <Route path="/settings/front-cms" element={<StudentProtectedRoute><FrontCmsSettingsPage /></StudentProtectedRoute>} />
+            <Route path="/settings/custom-fields" element={<StudentProtectedRoute><CustomFieldPage /></StudentProtectedRoute>} />
+            <Route path="/settings/system-fields" element={<StudentProtectedRoute><SystemFieldPage /></StudentProtectedRoute>} />
+            <Route path="/settings/file-types" element={<StudentProtectedRoute><FileTypePage /></StudentProtectedRoute>} />
+
+            {/* ── Student Portal ── */}
+            <Route path="/my-profile" element={<MyProfilePage />} />
+            <Route path="/attendance/my-attendance" element={<MyAttendancePage />} />
+            <Route path="/attendance/my-leave-requests" element={<MyLeaveRequestsPage />} />
+            <Route path="/examinations/my-results" element={<MyResultsPage />} />
+            <Route path="/examinations/my-marksheet" element={<MyMarksheetPage />} />
+            <Route path="/examinations/my-admit-card" element={<MyAdmitCardPage />} />
+            <Route path="/fees/due-fees" element={<DueFeesPage />} />
+            <Route path="/fees/payment-history" element={<PaymentHistoryPage />} />
+            <Route path="/homework/my-homework" element={<MyHomeworkPage />} />
+            <Route path="/download-center/shared-content" element={<SharedContentPage />} />
+            <Route path="/library/my-library" element={<MyLibraryPage />} />
+            <Route path="/transport/my-transport" element={<MyTransportPage />} />
+            <Route path="/online-exam/my-exams" element={<MyOnlineExamsPage />} />
+            <Route path="/lesson-plan/my-lessons" element={<MyLessonsPage />} />
+            <Route path="/lesson-plan/my-topics" element={<MyTopicsPage />} />
+            <Route path="/lesson-plan/my-lesson-plans" element={<MyLessonPlansPage />} />
+            <Route path="/certificate/my-certificates" element={<MyCertificatesPage />} />
+            <Route path="/certificate/my-id-card" element={<MyIDCardPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
           </Route>
 
           {/* Errors */}

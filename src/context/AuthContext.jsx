@@ -23,7 +23,7 @@ const AuthContext = createContext(null)
 
 function readStoredSession() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.AUTH)
+    const raw = sessionStorage.getItem(STORAGE_KEYS.AUTH)
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
@@ -32,7 +32,7 @@ function readStoredSession() {
 
 function readStoredTenant() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.TENANT)
+    const raw = sessionStorage.getItem(STORAGE_KEYS.TENANT)
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
@@ -46,17 +46,17 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (session) {
-      localStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(session))
+      sessionStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(session))
     } else {
-      localStorage.removeItem(STORAGE_KEYS.AUTH)
+      sessionStorage.removeItem(STORAGE_KEYS.AUTH)
     }
   }, [session])
 
   useEffect(() => {
     if (tenant) {
-      localStorage.setItem(STORAGE_KEYS.TENANT, JSON.stringify(tenant))
+      sessionStorage.setItem(STORAGE_KEYS.TENANT, JSON.stringify(tenant))
     } else {
-      localStorage.removeItem(STORAGE_KEYS.TENANT)
+      sessionStorage.removeItem(STORAGE_KEYS.TENANT)
     }
   }, [tenant])
 
@@ -83,12 +83,13 @@ export function AuthProvider({ children }) {
       try {
         const data = await authService.login(role, credentials)
         const user = {
-          id: data.id,
-          name: data.name,
-          email: data.email,
-          role: data.role || role,
+          id: data.id || data._id || data.data?.id,
+          name: data.name || data.data?.name,
+          email: data.email || data.data?.email,
+          role: data.role || data.data?.role || role,
         }
-        const newSession = { token: data.token, user, role: user.role }
+        const userToken = data.token || data.data?.token
+        const newSession = { token: userToken, user, role: user.role }
         setSession(newSession)
         await fetchTenant()
         return newSession
@@ -107,12 +108,13 @@ export function AuthProvider({ children }) {
         // Some signup responses return a token; if so, establish a session.
         if (result?.token) {
           const user = {
-            id: result.id,
-            name: result.name,
-            email: result.email,
-            role: result.role || role,
+            id: result.id || result._id || result.data?.id,
+            name: result.name || result.data?.name,
+            email: result.email || result.data?.email,
+            role: result.role || result.data?.role || role,
           }
-          const newSession = { token: result.token, user, role: user.role }
+          const userToken = result.token || result.data?.token
+          const newSession = { token: userToken, user, role: user.role }
           setSession(newSession)
           await fetchTenant()
           return newSession

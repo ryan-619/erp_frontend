@@ -33,6 +33,7 @@ import { useAsyncData } from '@/hooks/useAsyncData'
 import { hrService } from '@/services/hr.service'
 import { formatDate } from '@/utils/format'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/utils'
 
 // Reused by both the table and the detail drawer so status pills stay consistent.
@@ -54,8 +55,8 @@ function LeaveStatusPill({ status }) {
 
 export default function ApplyLeavePage() {
   const { toast } = useToast()
+  const { user } = useAuth()
   const { data: applyLeaves, isLoading: leavesLoading, refetch } = useAsyncData(() => hrService.getApplyLeaves(), [])
-  const { data: staffList, isLoading: staffLoading } = useAsyncData(() => hrService.getStaff(), [])
   const { data: leaveTypes, isLoading: typesLoading } = useAsyncData(() => hrService.getLeaveTypes(), [])
   
   const [viewApp, setViewApp] = useState(null)
@@ -64,24 +65,29 @@ export default function ApplyLeavePage() {
   const [submitting, setSubmitting] = useState(false)
 
   const allLeaves = applyLeaves || []
-  const staff = staffList || []
   const types = leaveTypes || []
 
+  // Filter to show only current staff's leave requests
+  const myLeaves = useMemo(() => {
+    return allLeaves.filter(leave => {
+      if (typeof leave.staff_id === 'object') {
+        return leave.staff_id._id === user.id || leave.staff_id.email === user.email
+      }
+      return leave.staff_id === user.id
+    })
+  }, [allLeaves, user.id, user.email])
+
   const stats = useMemo(() => ({
-    total: allLeaves.length,
-    pending: allLeaves.filter((l) => l.status === 'pending').length,
-    approved: allLeaves.filter((l) => l.status === 'approved').length,
-    rejected: allLeaves.filter((l) => l.status === 'rejected').length,
-  }), [allLeaves])
+    total: myLeaves.length,
+    pending: myLeaves.filter((l) => l.status === 'pending').length,
+    approved: myLeaves.filter((l) => l.status === 'approved').length,
+    rejected: myLeaves.filter((l) => l.status === 'rejected').length,
+  }), [myLeaves])
 
   const columns = useMemo(() => [
     { accessorKey: 'leave_type_id', header: 'Leave Type', cell: ({ row }) => {
       const leaveType = types.find(t => t._id === row.original.leave_type_id)
       return <Badge variant="outline">{leaveType?.leave_type || 'Unknown'}</Badge>
-    }},
-    { accessorKey: 'staff_id', header: 'Staff', cell: ({ row }) => {
-      const staffMember = staff.find(s => s._id === row.original.staff_id)
-      return <span className="text-sm">{staffMember?.name || 'Unknown'}</span>
     }},
     { accessorKey: 'from_date', header: 'From', cell: ({ row }) => formatDate(row.original.from_date) },
     { accessorKey: 'to_date', header: 'To', cell: ({ row }) => formatDate(row.original.to_date) },
@@ -90,7 +96,7 @@ export default function ApplyLeavePage() {
     ) },
     { accessorKey: 'createdAt', header: 'Applied On', cell: ({ row }) => formatDate(row.original.createdAt) },
     { accessorKey: 'status', header: 'Status', cell: ({ row }) => <LeaveStatusPill status={row.original.status} /> },
-  ], [staff, types])
+  ], [types])
 
   const rowActions = (app) => [
     { label: 'View Details', icon: Eye, onClick: () => setViewApp(app) },
@@ -143,9 +149,7 @@ export default function ApplyLeavePage() {
           <div className="rounded-xl border bg-card p-6 space-y-4">
             <h3 className="text-lg font-semibold">Submit Leave Application</h3>
             <ApplyLeaveForm
-              staff={staff}
               leaveTypes={types}
-              staffLoading={staffLoading}
               typesLoading={typesLoading}
               submitting={submitting}
               initial={editRow}
@@ -173,12 +177,12 @@ export default function ApplyLeavePage() {
 
           {leavesLoading ? (
             <LoadingSkeleton variant="table" rows={5} cols={7} />
-          ) : allLeaves.length === 0 ? (
+          ) : myLeaves.length === 0 ? (
             <NoData title="No applications yet" description="Your submitted leave applications will appear here." />
           ) : (
             <DataTable
               columns={columns}
-              data={allLeaves}
+              data={myLeaves}
               rowActions={(app) => <ActionDropdown actions={rowActions(app)} />}
             />
           )}
@@ -198,14 +202,12 @@ export default function ApplyLeavePage() {
           <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             {(() => {
               const leaveType = types.find(t => t._id === viewApp.leave_type_id)
-              const staffMember = staff.find(s => s._id === viewApp.staff_id)
               const fromDate = new Date(viewApp.from_date)
               const toDate = new Date(viewApp.to_date)
               const days = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1
               
               return [
                 { label: 'Leave Type', value: <Badge variant="outline">{leaveType?.leave_type || 'Unknown'}</Badge> },
-                { label: 'Staff Member', value: staffMember?.name || 'Unknown' },
                 { label: 'Days', value: `${days} day${days > 1 ? 's' : ''}` },
                 { label: 'From', value: formatDate(viewApp.from_date) },
                 { label: 'To', value: formatDate(viewApp.to_date) },
@@ -241,9 +243,10 @@ export default function ApplyLeavePage() {
 }
 
 // ─── ApplyLeaveForm Component ───────────────────────────────────────────────────────
-function ApplyLeaveForm({ staff, leaveTypes, staffLoading, typesLoading, submitting, initial, onSubmit, onCancel }) {
+function ApplyLeaveForm({ leaveTypes, typesLoading, submitting, initial, onSubmit, onCancel }) {
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
-    staff_id: '',
+    staff_id: user?.id || '',
     leave_type_id: '',
     from_date: '',
     to_date: '',
@@ -253,7 +256,7 @@ function ApplyLeaveForm({ staff, leaveTypes, staffLoading, typesLoading, submitt
   useEffect(() => {
     if (initial) {
       setFormData({
-        staff_id: initial.staff_id || '',
+        staff_id: initial.staff_id || user?.id || '',
         leave_type_id: initial.leave_type_id || '',
         from_date: initial.from_date ? initial.from_date.split('T')[0] : '',
         to_date: initial.to_date ? initial.to_date.split('T')[0] : '',
@@ -261,14 +264,14 @@ function ApplyLeaveForm({ staff, leaveTypes, staffLoading, typesLoading, submitt
       })
     } else {
       setFormData({
-        staff_id: staff[0]?._id || '',
+        staff_id: user?.id || '',
         leave_type_id: leaveTypes[0]?._id || '',
         from_date: '',
         to_date: '',
         reason: '',
       })
     }
-  }, [initial, staff, leaveTypes])
+  }, [initial, leaveTypes, user?.id])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -277,22 +280,6 @@ function ApplyLeaveForm({ staff, leaveTypes, staffLoading, typesLoading, submitt
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="staff_id">Staff Member *</Label>
-        <select
-          id="staff_id"
-          value={formData.staff_id}
-          onChange={(e) => setFormData({ ...formData, staff_id: e.target.value })}
-          disabled={staffLoading}
-          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-          required
-        >
-          <option value="">Select staff member</option>
-          {staff.map((s) => (
-            <option key={s._id} value={s._id}>{s.name}</option>
-          ))}
-        </select>
-      </div>
       <div>
         <Label htmlFor="leave_type_id">Leave Type *</Label>
         <select

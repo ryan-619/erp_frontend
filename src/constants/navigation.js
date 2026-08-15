@@ -60,6 +60,7 @@ export const NAV_GROUPS = [
     label: 'Attendance',
     items: [
       { title: 'Student Attendance', to: '/attendance', icon: 'ClipboardCheck' },
+      { title: 'Apply Leave', to: '/attendance/apply-leave', icon: 'Calendar' },
       { title: 'Approve Leave', to: '/attendance/approve-leave', icon: 'CalendarCheck' },
       { title: 'Attendance By Date', to: '/attendance/by-date', icon: 'CalendarDays' },
     ],
@@ -157,7 +158,7 @@ export const ROLE_DASHBOARD = {
   superadmin: '/dashboard',
   admin: '/admin/dashboard',
   staff: '/staff/dashboard',
-  student: '/student/dashboard',
+  student: '/dashboard',
   parent: '/parent/dashboard',
 }
 
@@ -208,8 +209,8 @@ export const SIGNUP_FIELDS = {
 export const ROLE_SIDEBAR = {
   superadmin: ['dashboard', 'institution', 'academics', 'attendance', 'hr', 'settings-module', 'users', 'administration'],
   admin: ['dashboard', 'students', 'academics', 'attendance', 'fees', 'hr', 'examinations', 'library', 'transport', 'hostel', 'front-office', 'homework', 'lesson-plan', 'income', 'expenses', 'inventory', 'online-exam', 'certificate', 'alumni', 'download-center', 'front-cms', 'settings-module'],
-  staff: ['dashboard', 'attendance', 'homework', 'academics', 'examinations', 'online-exam', 'lesson-plan', 'library'],
-  student: ['dashboard', 'attendance', 'homework', 'examinations', 'online-exam', 'fees', 'library', 'transport', 'hostel'],
+  staff: ['dashboard', 'attendance', 'hr', 'homework', 'academics', 'examinations', 'online-exam', 'lesson-plan', 'library'],
+  student: ['dashboard', 'my-profile', 'academics', 'attendance', 'examinations', 'fees', 'homework', 'download-center', 'online-exam', 'library', 'transport', 'certificate', 'notifications', 'lesson-plan'],
   parent: ['dashboard', 'students', 'attendance', 'fees', 'examinations', 'transport', 'hostel'],
 }
 

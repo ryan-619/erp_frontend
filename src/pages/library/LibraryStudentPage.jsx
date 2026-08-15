@@ -89,7 +89,7 @@ export default function LibraryStudentPage() {
             </div>
             <div className="flex flex-col">
               <span className="font-medium hover:underline">{studentName}</span>
-              <span className="text-xs text-muted-foreground">{student?.student_id || '—'}</span>
+              <span className="text-xs text-muted-foreground">{student?.roll_number || '—'}</span>
             </div>
           </button>
         )
@@ -222,7 +222,7 @@ export default function LibraryStudentPage() {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold">{studentName}</p>
-                  <p className="text-xs text-muted-foreground">{student?.student_id || '—'}</p>
+                  <p className="text-xs text-muted-foreground">{student?.roll_number || '—'}</p>
                 </div>
                 <Badge variant={isValid ? 'default' : 'destructive'}>
                   {isValid ? 'Active' : 'Expired'}
@@ -311,7 +311,7 @@ function StudentForm({ initial, students, studentLoading, onSubmit, onCancel }) 
               ? (typeof s.name === 'string' ? s.name : `${s.name.first || ''} ${s.name.last || ''}`.trim())
               : 'Unknown'
             return (
-              <option key={s._id} value={s._id}>{studentName} ({s.student_id || 'No ID'})</option>
+              <option key={s._id} value={s._id}>{studentName} ({s.roll_number || 'No Roll No'})</option>
             )
           })}
         </select>

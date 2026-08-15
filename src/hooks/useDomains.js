@@ -19,7 +19,6 @@ export function useDomains() {
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-console.log("Domain API Response:", data);
 
 const rows = Array.isArray(data)
   ? data

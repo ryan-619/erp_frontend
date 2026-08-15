@@ -254,6 +254,22 @@ export function useLeaveApprovals() {
     toDate, setToDate,
     approveLeave,
     rejectLeave,
+    refetch,
+  }
+
+  return {
+    rows: filtered,
+    allLeaves: rows,
+    stats,
+    isLoading,
+    search, setSearch,
+    status, setStatus,
+    classFilter, setClassFilter,
+    sectionFilter, setSectionFilter,
+    fromDate, setFromDate,
+    toDate, setToDate,
+    approveLeave,
+    rejectLeave,
     
   }
 }

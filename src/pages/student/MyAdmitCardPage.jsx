@@ -1,25 +1,16 @@
-// ====================================================================
-// Module: Examinations
-// Page: Print Admit Card
-//
-// Purpose: Search students and print admit cards for examinations.
-// Data Source: studentService.list(), examSchedule
-// ====================================================================
-
 import { useMemo, useState, useCallback } from 'react'
 import { Printer, RefreshCw, FileText, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import Breadcrumbs from '@/components/breadcrumbs/Breadcrumbs'
 import { PageHeader } from '@/components/PageHeader'
-import { SearchBar } from '@/components/SearchBar'
 import { StatCard } from '@/components/StatCard'
 import { DataTable } from '@/components/DataTable'
 import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { NoData } from '@/components/NoData'
+import { useAuth } from '@/context/AuthContext'
 import { useAsyncData } from '@/hooks/useAsyncData'
 import { useToast } from '@/hooks/use-toast'
-import studentService from '@/services/student.service'
+import { studentPortalService } from '@/services/studentPortal.service'
 import { examinationService } from '@/services/examination.service'
 import { academicsService } from '@/services/academics.service'
 
@@ -32,33 +23,28 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export default function PrintAdmitCardPage() {
+export default function MyAdmitCardPage() {
+  const { user, role } = useAuth()
   const { toast } = useToast()
-  const [search, setSearch] = useState('')
+  const studentId = user?.id
   const [printingId, setPrintingId] = useState(null)
   const [selectedExamGroup, setSelectedExamGroup] = useState('')
-  const [selectedClass, setSelectedClass] = useState('')
 
-  const { data, isLoading, refetch } = useAsyncData(
-    () => studentService.list(),
+  // Fetch exam schedules
+  const { data: examSchedulesData, isLoading, refetch } = useAsyncData(
+    () => examinationService.getExamSchedules(),
     []
   )
 
-  // Fetch exam groups for selection
+  // Fetch exam groups for filter
   const { data: examGroupsData } = useAsyncData(
     () => examinationService.getExamGroups(),
     []
   )
 
-  // Fetch classes for selection
+  // Fetch classes for mapping
   const { data: classesData } = useAsyncData(
     () => academicsService.classes(),
-    []
-  )
-
-  // Fetch exam schedules (same as ExamSchedulePage)
-  const { data: examSchedulesData } = useAsyncData(
-    () => examinationService.getExamSchedules(),
     []
   )
 
@@ -68,18 +54,24 @@ export default function PrintAdmitCardPage() {
     []
   )
 
-  // Fetch admit card template (school name)
+  // Fetch admit card template
   const { data: templateData } = useAsyncData(
     () => examinationService.getAdmitCardDesigns(),
     []
   )
 
-  // Create maps for ID to name conversion (same as ExamSchedulePage)
+  // Fetch student profile for full details
+  const { data: studentProfile } = useAsyncData(
+    () => studentId ? studentPortalService.getMyProfile(studentId) : Promise.resolve(null),
+    [studentId]
+  )
+
+  // Create maps for ID to name conversion
   const groupMap = useMemo(() => {
     const groups = Array.isArray(examGroupsData?.data) ? examGroupsData.data : Array.isArray(examGroupsData) ? examGroupsData : []
     return Object.fromEntries(groups.map((x) => [x._id, x.exam_name || x.name]))
   }, [examGroupsData])
-  
+
   const classMap = useMemo(() => {
     const classes = Array.isArray(classesData?.data) ? classesData.data : Array.isArray(classesData) ? classesData : []
     return Object.fromEntries(classes.map((x) => [x._id, x.class_name || x.name]))
@@ -90,104 +82,79 @@ export default function PrintAdmitCardPage() {
     return Object.fromEntries(subjects.map((x) => [x._id, x.subject_name || x.name]))
   }, [subjectsData])
 
-  const rawRows = useMemo(() => {
-    const rows = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
-    return rows
-  }, [data])
+  const template = useMemo(() => {
+    const tmpl = templateData?.data?.[0] || {}
+    return tmpl
+  }, [templateData])
 
   const examSchedules = useMemo(() => {
     const schedules = Array.isArray(examSchedulesData?.data) ? examSchedulesData.data : Array.isArray(examSchedulesData) ? examSchedulesData : []
     return schedules
   }, [examSchedulesData])
 
-  const template = useMemo(() => {
-    const tmpl = templateData?.data?.[0] || {}
-    return tmpl
-  }, [templateData])
-
-  // Filter exam schedules based on selection (match by IDs like ExamSchedulePage)
-  const filteredExamSchedules = useMemo(() => {
-    let schedules = examSchedules
+  // Filter exam schedules for student's class
+  const studentExamSchedules = useMemo(() => {
+    if (!studentProfile) return []
+    const studentClass = studentProfile.class_name || studentProfile.class
+    if (!studentClass) return []
     
-    if (selectedExamGroup) {
-      schedules = schedules.filter(s => {
-        const examGroupId = getId(s.exam_group_id)
-        return examGroupId === selectedExamGroup
-      })
-    }
-    
-    if (selectedClass) {
-      schedules = schedules.filter(s => {
-        const classId = getId(s.class_id)
-        return classId === selectedClass
-      })
-    }
-    
-    return schedules
-  }, [examSchedules, selectedExamGroup, selectedClass])
+    return examSchedules.filter(schedule => {
+      const classId = getId(schedule.class_id)
+      const className = classMap[classId] || ''
+      // Match class (e.g., "12" matches "Class 12" or "12")
+      return className.includes(studentClass) || studentClass.includes(className)
+    })
+  }, [examSchedules, studentProfile, classMap])
 
-  const filteredRows = useMemo(() => {
-    let result = rawRows
+  // Group exam schedules by exam group
+  const examGroupSchedules = useMemo(() => {
+    const grouped = {}
+    studentExamSchedules.forEach(schedule => {
+      const examGroupId = getId(schedule.exam_group_id)
+      if (!grouped[examGroupId]) {
+        grouped[examGroupId] = []
+      }
+      grouped[examGroupId].push(schedule)
+    })
+    return grouped
+  }, [studentExamSchedules])
 
-    // IMPORTANT: Only show students if both exam group and class are selected AND exam schedule exists
-    if (!selectedExamGroup || !selectedClass) {
-      return []
+  // Filter by selected exam group
+  const filteredExamGroups = useMemo(() => {
+    if (!selectedExamGroup) {
+      return Object.entries(examGroupSchedules).map(([examGroupId, schedules]) => ({
+        examGroupId,
+        examGroupName: groupMap[examGroupId] || 'Unknown',
+        schedules,
+      }))
     }
-
-    if (filteredExamSchedules.length === 0) {
-      return []
+    if (examGroupSchedules[selectedExamGroup]) {
+      return [{
+        examGroupId: selectedExamGroup,
+        examGroupName: groupMap[selectedExamGroup] || 'Unknown',
+        schedules: examGroupSchedules[selectedExamGroup],
+      }]
     }
-
-    // Filter by class if selected
-    if (selectedClass) {
-      const className = classMap[selectedClass] || selectedClass
-      // Match if class_name contains the selected class name (e.g., "Class 4" matches "4")
-      result = result.filter(r => {
-        const studentClass = r.class_name || ''
-        return studentClass.includes(className) || className.includes(studentClass)
-      })
-    }
-
-    // Filter by search
-    if (!search.trim()) {
-      return result
-    }
-
-    const q = search.toLowerCase()
-    result = result.filter((r) =>
-      [
-        r.name?.first,
-        r.name?.last,
-        r.roll_number,
-        r.class_name,
-        r.section,
-      ]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q))
-    )
-    return result
-  }, [rawRows, search, selectedClass, classMap, selectedExamGroup, filteredExamSchedules])
+    return []
+  }, [examGroupSchedules, selectedExamGroup, groupMap])
 
   const stats = useMemo(() => ({
-    total: rawRows.length,
-    ready: rawRows.filter(r => r.status === "active").length,
-  }), [rawRows])
+    total: Object.keys(examGroupSchedules).length,
+    upcoming: studentExamSchedules.length,
+  }), [examGroupSchedules, studentExamSchedules])
 
-  const generateAdmitCardHTML = (studentData, template, examSchedules) => {
+  const generateAdmitCardHTML = (studentData, template, examSchedules, examGroupName) => {
     const studentName = `${studentData.name?.first || ''} ${studentData.name?.last || ''}`.trim()
     const fatherName = studentData.father_name || null
     
-    // Use template data (school name)
+    // Use template data
     const schoolName = template?.header || 'SCHOOL NAME'
     const schoolLogo = template?.school_logo || ''
     
     // Use first exam schedule for basic info
     const firstSchedule = examSchedules[0] || {}
-    const examGroupId = getId(firstSchedule.exam_group_id)
     const classId = getId(firstSchedule.class_id)
-    
-    const examGroup = groupMap[examGroupId] || 'N/A'
-    const className = classMap[classId] || 'N/A'
+    const className = classMap[classId] || studentData.class_name || 'N/A'
     
     // Reporting time fixed to "30 min before exam"
     const reportingTime = '30 min before exam'
@@ -203,7 +170,7 @@ export default function PrintAdmitCardPage() {
       
       return `
         <tr>
-          <td>${examGroup}</td>
+          <td>${examGroupName}</td>
           <td>${subject}</td>
           <td>${examDate}</td>
           <td>${startTime}</td>
@@ -366,7 +333,7 @@ export default function PrintAdmitCardPage() {
                   }
                   <div class="school-info">
                     <h1>${schoolName}</h1>
-                    <h2>${examGroup}</h2>
+                    <h2>${examGroupName}</h2>
                   </div>
                 </div>
                 <div class="photo-box">
@@ -436,18 +403,9 @@ export default function PrintAdmitCardPage() {
     `
   }
 
-  const handlePrint = useCallback((student) => {
-    if (filteredExamSchedules.length === 0) {
-      toast({ 
-        title: 'No Exam Schedule Found', 
-        description: 'Please select the correct Exam Group and Class that has an exam schedule.',
-        variant: 'destructive' 
-      })
-      return
-    }
-    
-    // Generate admit card with ALL exam schedules (not just first one)
-    const html = generateAdmitCardHTML(student, template, filteredExamSchedules)
+  const handlePrint = useCallback((examGroupData) => {
+    const student = studentProfile || user
+    const html = generateAdmitCardHTML(student, template, examGroupData.schedules, examGroupData.examGroupName)
     
     const printWindow = window.open('', '_blank')
     if (!printWindow) {
@@ -463,57 +421,47 @@ export default function PrintAdmitCardPage() {
       printWindow.print()
       toast({ title: 'Success', description: 'Admit card opened for printing' })
     }, 250)
-  }, [filteredExamSchedules, template, toast])
+  }, [studentProfile, user, template, toast])
 
   const columns = useMemo(() => [
     {
-      accessorKey: "student",
-      header: "Student",
+      accessorKey: "examGroupName",
+      header: "Exam Group",
       cell: ({ row }) => (
-        <div>
-          <p className="font-medium">
-            {row.original.name?.first} {row.original.name?.last}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {row.original.email}
-          </p>
-        </div>
+        <span className="font-medium">{row.original.examGroupName}</span>
       ),
     },
     {
-      accessorKey: "roll_number",
-      header: "Roll No",
+      accessorKey: "schedules",
+      header: "Subjects",
+      cell: ({ row }) => {
+        const subjects = row.original.schedules.map(s => {
+          const subjectId = getId(s.subject_id)
+          return subjectMap[subjectId] || s.subject_name || s.subject?.subject_name || 'N/A'
+        }).join(', ')
+        return subjects
+      },
     },
     {
-      accessorKey: "class_name",
-      header: "Class",
+      accessorKey: "schedules",
+      header: "Exam Dates",
+      cell: ({ row }) => {
+        const dates = row.original.schedules.map(s => formatDate(s.date)).join(', ')
+        return dates
+      },
     },
     {
-      accessorKey: "section",
-      header: "Section",
-    },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => (
-        <Badge
-          variant={
-            row.original.status === "active"
-              ? "default"
-              : "secondary"
-          }
-        >
-          {row.original.status}
-        </Badge>
-      ),
+      accessorKey: "schedules",
+      header: "Total Exams",
+      cell: ({ row }) => row.original.schedules.length,
     },
     {
       id: "actions",
       header: "Actions",
       enableSorting: false,
       cell: ({ row }) => {
-        const studentId = row.original._id || row.original.id || row.original.student_id
-        const isPrinting = printingId === studentId
+        const examGroupId = row.original.examGroupId
+        const isPrinting = printingId === examGroupId
         return (
           <Button
             size="sm"
@@ -533,20 +481,24 @@ export default function PrintAdmitCardPage() {
     },
   ], [printingId, handlePrint])
 
+  if (role !== 'student') {
+    return (
+      <div className="flex h-[70vh] items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Access Denied</h1>
+          <p className="mt-2 text-muted-foreground">This page is only accessible to students.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      <Breadcrumbs
-        items={[
-          { label: 'Home', to: '/dashboard' },
-          { label: 'Examinations', to: '/examinations/exam-groups' },
-          { label: 'Print Admit Card' },
-        ]}
-      />
-
+      <Breadcrumbs items={[{ label: 'Home', to: '/dashboard' }, { label: 'Examinations' }, { label: 'My Admit Card' }]} />
       <PageHeader
-        title="Print Admit Card"
-        description="Search students and print admit cards for examinations."
-        icon={Printer}
+        title="My Admit Card"
+        description="View and print your examination admit cards."
+        icon={FileText}
         actions={
           <Button
             variant="outline"
@@ -560,8 +512,8 @@ export default function PrintAdmitCardPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <StatCard label="Total Students" value={stats.total} icon={FileText} accent="primary" />
-        <StatCard label="Active Students" value={stats.ready} icon={CheckCircle2} accent="success" />
+        <StatCard label="Total Exam Groups" value={stats.total} icon={FileText} accent="primary" />
+        <StatCard label="Upcoming Exams" value={stats.upcoming} icon={CheckCircle2} accent="success" />
       </div>
 
       <div className="flex gap-3 items-center">
@@ -572,7 +524,7 @@ export default function PrintAdmitCardPage() {
             onChange={(e) => setSelectedExamGroup(e.target.value)}
             className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm"
           >
-            <option value="">Select Exam Group</option>
+            <option value="">All Exam Groups</option>
             {(examGroupsData || []).map(eg => (
               <option key={eg._id} value={eg._id}>
                 {eg.exam_name || eg.name}
@@ -580,75 +532,26 @@ export default function PrintAdmitCardPage() {
             ))}
           </select>
         </div>
-        <div className="flex-1">
-          <span className="text-xs font-medium">Class</span>
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="w-full h-9 mt-1 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">Select Class</option>
-            {(classesData || []).map(cls => (
-              <option key={cls._id} value={cls._id}>
-                {cls.class_name || cls.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex-1">
-          <span className="text-xs font-medium">Search</span>
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            disabled={rawRows.length === 0}
-            placeholder="Search student..."
-            className="w-full mt-1"
-          />
-        </div>
       </div>
 
-      {selectedExamGroup && selectedClass && (
-        <div className={`flex items-center gap-2 px-4 py-3 rounded-lg border ${
-          filteredExamSchedules.length > 0 
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-            : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-        }`}>
-          <span className={`text-sm ${
-            filteredExamSchedules.length > 0 
-              ? 'text-green-700 dark:text-green-300' 
-              : 'text-yellow-700 dark:text-yellow-300'
-          }`}>
-            {filteredExamSchedules.length > 0 
-              ? `✓ ${filteredExamSchedules.length} exam schedule(s) found for this selection` 
-              : '⚠ No exam schedule found for this Exam Group and Class combination. Please check the Exam Schedule page.'}
-          </span>
-        </div>
-      )}
-
       {isLoading ? (
-        <LoadingSkeleton variant="table" rows={6} cols={6} />
-      ) : !selectedExamGroup || !selectedClass ? (
+        <LoadingSkeleton variant="table" rows={6} cols={5} />
+      ) : studentExamSchedules.length === 0 ? (
         <NoData
-          icon={Printer}
-          title="Select Exam Group and Class"
-          description="Please select both an Exam Group and Class to view students for admit card printing."
+          icon={FileText}
+          title="No Admit Cards Available"
+          description="Your exam schedules will appear here once published."
         />
-      ) : filteredExamSchedules.length === 0 ? (
+      ) : filteredExamGroups.length === 0 ? (
         <NoData
-          icon={Printer}
-          title="No Exam Schedule Found"
-          description="No exam schedule exists for the selected Exam Group and Class. Please create an exam schedule first."
-        />
-      ) : filteredRows.length === 0 ? (
-        <NoData
-          icon={Printer}
-          title="No Students Found"
-          description="No students are available for admit card printing for this class."
+          icon={FileText}
+          title="No Results Found"
+          description="Try selecting a different exam group."
         />
       ) : (
         <DataTable
           columns={columns}
-          data={filteredRows}
+          data={filteredExamGroups}
         />
       )}
     </div>

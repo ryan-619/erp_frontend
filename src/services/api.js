@@ -38,7 +38,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    const raw = localStorage.getItem(STORAGE_KEYS.AUTH)
+    const raw = sessionStorage.getItem(STORAGE_KEYS.AUTH)
 
     if (raw) {
       try {
@@ -48,14 +48,14 @@ apiClient.interceptors.request.use(
           config.headers.Authorization = `Bearer ${token}`
         }
       } catch (err) {
-        console.error('Invalid auth data in localStorage:', err)
+        console.error('Invalid auth data in sessionStorage:', err)
       }
     }
 
     // Multi-tenant: attach tenant (school) identifier so the backend can
     // resolve the correct tenant DB. The backend reads this from the
     // `x-tenant-id` header (see middleware/tenantMiddleware).
-    const tenantRaw = localStorage.getItem(STORAGE_KEYS.TENANT)
+    const tenantRaw = sessionStorage.getItem(STORAGE_KEYS.TENANT)
     if (tenantRaw) {
       try {
         const tenant = JSON.parse(tenantRaw)
@@ -69,11 +69,6 @@ apiClient.interceptors.request.use(
         // ignore malformed tenant data
       }
     }
-
-     
-    console.log("Base URL:", config.baseURL)
-    console.log("Request URL:", config.url)
-    console.log("Final URL:", `${config.baseURL}${config.url}`)
 
     return config
   },
@@ -140,8 +135,8 @@ apiClient.interceptors.response.use(
 
     // Clear session if backend says Unauthorized (expired/invalid token).
     if (normalized.status === 401 && !isAuthEndpoint) {
-      localStorage.removeItem(STORAGE_KEYS.AUTH)
-      localStorage.removeItem(STORAGE_KEYS.TENANT)
+      sessionStorage.removeItem(STORAGE_KEYS.AUTH)
+      sessionStorage.removeItem(STORAGE_KEYS.TENANT)
       // Redirect to login if we're in the browser (not during SSR/build).
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login'

@@ -114,7 +114,6 @@ export default function StudentAttendancePage() {
   }, [])
 
   const handleCreate = async (createForm) => {
-    console.log("Create Payload:", createForm)
     await createAttendance(createForm)
     setAddOpen(false)
   }
@@ -286,6 +285,7 @@ export default function StudentAttendancePage() {
         title="Mark Attendance"
         classOptions={classOptions}
         studentOptions={studentOptions}
+        sectionOptions={sectionOptions}
         onSubmit={handleCreate}
       />
 
@@ -296,6 +296,7 @@ export default function StudentAttendancePage() {
         initial={editRow}
         classOptions={classOptions}
         studentOptions={studentOptions}
+        sectionOptions={sectionOptions}
         onSubmit={async (payload) => {
           await updateAttendance(editRow._id, payload)
           setEditRow(null)
@@ -360,22 +361,32 @@ export default function StudentAttendancePage() {
   )
 }
 
-function AttendanceDrawer({ open, onOpenChange, title, initial, classOptions, studentOptions, onSubmit }) {
+function AttendanceDrawer({ open, onOpenChange, title, initial, classOptions, studentOptions, sectionOptions, onSubmit }) {
   const [form, setForm] = useState({
     student_id: '',
     class_id: '',
-    section: 'A',
+    section: '',
     attendance_date: new Date().toISOString().split('T')[0],
     status: 'present',
     remarks: '',
   })
+
+  // Auto-populate section when student is selected
+  useEffect(() => {
+    if (form.student_id) {
+      const selectedStudent = studentOptions.find(s => s._id === form.student_id)
+      if (selectedStudent?.section) {
+        setForm(prev => ({ ...prev, section: selectedStudent.section }))
+      }
+    }
+  }, [form.student_id, studentOptions])
 
   useEffect(() => {
     if (initial) {
       setForm({
         student_id: typeof initial.student_id === 'object' ? initial.student_id._id : initial.student_id || '',
         class_id: initial.class_id || '',
-        section: initial.section || 'A',
+        section: initial.section || '',
         attendance_date: initial.attendance_date ? new Date(initial.attendance_date).toISOString().split('T')[0] : '',
         status: initial.status || 'present',
         remarks: initial.remarks || '',
@@ -384,7 +395,7 @@ function AttendanceDrawer({ open, onOpenChange, title, initial, classOptions, st
       setForm({
         student_id: '',
         class_id: '',
-        section: 'A',
+        section: '',
         attendance_date: new Date().toISOString().split('T')[0],
         status: 'present',
         remarks: '',
@@ -442,6 +453,21 @@ function AttendanceDrawer({ open, onOpenChange, title, initial, classOptions, st
               <option value="">Select Class</option>
               {classOptions.map((c) => (
                 <option key={c._id} value={c._id}>{c.class_name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Section <span className="text-destructive">*</span></Label>
+            <select
+              value={form.section}
+              onChange={(e) => setForm({ ...form, section: e.target.value })}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+              required
+            >
+              <option value="">Select Section</option>
+              {sectionOptions.map((s) => (
+                <option key={s._id} value={s.section_name}>{s.section_name}</option>
               ))}
             </select>
           </div>

@@ -81,7 +81,20 @@ export default function UploadShareContentPage() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Download className="h-4 w-4" />
           </div>
-          <span className="font-medium hover:underline">{row.original.title}</span>
+          <div className="flex flex-col">
+            <span className="font-medium hover:underline">{row.original.title}</span>
+            {row.original.file_url && (
+              <a 
+                href={row.original.file_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                <Download className="h-3 w-3" /> Download
+              </a>
+            )}
+          </div>
         </button>
       ),
     },
@@ -178,7 +191,19 @@ export default function UploadShareContentPage() {
               {[
                 { label: 'Content Type', value: contentTypes.find(t => t._id === viewRow.content_type_id)?.content_type_name || 'Unknown' },
                 { label: 'Description', value: viewRow.description },
-                { label: 'File URL', value: viewRow.file_url },
+                { 
+                  label: 'File URL', 
+                  value: viewRow.file_url ? (
+                    <a 
+                      href={viewRow.file_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      <Download className="h-3 w-3" /> Download File
+                    </a>
+                  ) : '—'
+                },
                 { label: 'Created On', value: formatDate(viewRow.createdAt) },
               ].map((f) => (
                 <div key={f.label} className="space-y-0.5">

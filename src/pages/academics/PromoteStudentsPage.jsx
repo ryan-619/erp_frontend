@@ -68,7 +68,7 @@ export default function PromoteStudentsPage() {
         setClassOptions(classRes || [])
         setStudentOptions(studentRes?.data || studentRes || [])
       } catch (err) {
-        console.log(err)
+        // Error handling
       }
     }
 

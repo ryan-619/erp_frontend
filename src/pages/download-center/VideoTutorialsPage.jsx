@@ -148,7 +148,7 @@ export default function VideoTutorialsPage() {
         onOpenChange={(o) => !o && setViewRow(null)}
         title="Video Details"
         description={viewRow?.title}
-        width="sm:max-w-md"
+        width="sm:max-w-2xl"
         footer={<Button variant="outline" onClick={() => setViewRow(null)}>Close</Button>}
       >
         {viewRow && (
@@ -162,12 +162,46 @@ export default function VideoTutorialsPage() {
               </div>
             </div>
 
+            {/* Video Player */}
+            {viewRow.video_url && (
+              <div className="w-full">
+                <div className="aspect-video w-full rounded-lg overflow-hidden bg-black">
+                  <video
+                    controls
+                    className="w-full h-full"
+                    preload="metadata"
+                  >
+                    <source src={viewRow.video_url} type="video/mp4" />
+                    <source src={viewRow.video_url} type="video/webm" />
+                    <source src={viewRow.video_url} type="video/ogg" />
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              </div>
+            )}
+
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
               {[
                 { label: 'Category', value: viewRow.category },
                 { label: 'Description', value: viewRow.description },
-                { label: 'Video URL', value: viewRow.video_url },
-                { label: 'Thumbnail', value: viewRow.thumbnail },
+                { label: 'Video URL', value: (
+                  <a 
+                    href={viewRow.video_url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline break-all"
+                  >
+                    {viewRow.video_url}
+                  </a>
+                )},
+                { label: 'Thumbnail', value: viewRow.thumbnail && (
+                  <img 
+                    src={viewRow.thumbnail} 
+                    alt="Thumbnail" 
+                    className="w-24 h-16 object-cover rounded"
+                    onError={(e) => e.target.style.display = 'none'}
+                  />
+                )},
                 { label: 'Created On', value: formatDate(viewRow.createdAt) },
               ].map((f) => (
                 <div key={f.label} className="space-y-0.5">

@@ -19,6 +19,7 @@ import {
   Share2,
   Plus,
   Trash2,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -38,6 +39,7 @@ import { FormSection } from '@/components/FormSection'
 import { StatusBadge } from '@/components/StatusBadge'
 import { useShareLists } from '@/hooks/useDownloadCenter'
 import { formatDate } from '@/utils/format'
+import { useAuth } from '@/context/AuthContext'
 
 const EXPORT_COLS = [
   { key: 'content_title', label: 'Content Title' },
@@ -48,6 +50,7 @@ const EXPORT_COLS = [
 ]
 
 export default function ContentShareListPage() {
+  const { role } = useAuth()
   const {
     rows, contents, classes, stats, isLoading,
     search, setSearch,
@@ -62,6 +65,14 @@ export default function ContentShareListPage() {
     setAddOpen(false)
   }
 
+  const handleDelete = async () => {
+    await deleteShareList(deleteRow._id)
+    setDeleteRow(null)
+  }
+
+  // Students cannot modify share lists
+  const canModify = role !== 'student'
+
   const columns = useMemo(() => [
     {
       accessorKey: 'content_id',
@@ -73,7 +84,19 @@ export default function ContentShareListPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Share2 className="h-4 w-4" />
             </div>
-            <span className="font-medium">{content?.title || row.original.content_id}</span>
+            <div className="flex flex-col">
+              <span className="font-medium">{content?.title || row.original.content_id}</span>
+              {content?.file_url && (
+                <a 
+                  href={content.file_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  <Download className="h-3 w-3" /> Download
+                </a>
+              )}
+            </div>
           </div>
         )
       },
@@ -90,9 +113,12 @@ export default function ContentShareListPage() {
     { accessorKey: 'note', header: 'Note' },
   ], [contents, classes])
 
-  const rowActions = (r) => [
-    { label: 'Delete', icon: Trash2, variant: 'destructive', onClick: () => setDeleteRow(r) },
-  ]
+  const rowActions = (r) => {
+    if (!canModify) return []
+    return [
+      { label: 'Delete', icon: Trash2, variant: 'destructive', onClick: () => setDeleteRow(r) },
+    ]
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -101,7 +127,7 @@ export default function ContentShareListPage() {
         title="Content Share List"
         description="View and manage content shared with specific classes."
         icon={Share2}
-        actions={<Button onClick={() => setAddOpen(true)}><Plus className="mr-2 h-4 w-4" /> Share Content</Button>}
+        actions={canModify ? <Button onClick={() => setAddOpen(true)}><Plus className="mr-2 h-4 w-4" /> Share Content</Button> : null}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -123,10 +149,10 @@ export default function ContentShareListPage() {
         <DataTable
           columns={columns}
           data={rows}
-          enableSelection
-          enableExport
+          enableSelection={canModify}
+          enableExport={canModify}
           exportFilename="content-share-list"
-          rowActions={(r) => <ActionDropdown actions={rowActions(r)} />}
+          rowActions={canModify ? (r) => <ActionDropdown actions={rowActions(r)} /> : undefined}
         />
       )}
 
@@ -144,7 +170,7 @@ export default function ContentShareListPage() {
         open={!!deleteRow}
         onOpenChange={(o) => !o && setDeleteRow(null)}
         entityName={deleteRow?.content_title}
-        onConfirm={() => deleteShareList(deleteRow._id)}
+        onConfirm={handleDelete}
       />
     </div>
   )

@@ -71,7 +71,17 @@ export default function IssueItemPage() {
     let issuedToName = ''
     if (r.issued_to_type === 'student') {
       const student = allStudents.find(s => s._id === r.issued_to_id)
-      issuedToName = typeof student === 'string' ? student : student?.full_name || student?.first_name || 'Unknown'
+      if (student) {
+        if (typeof student === 'string') {
+          issuedToName = student
+        } else if (student?.name) {
+          const firstName = student.name.first || ''
+          const lastName = student.name.last || ''
+          issuedToName = firstName || lastName ? `${firstName} ${lastName}`.trim() : 'Unknown'
+        } else {
+          issuedToName = student?.full_name || student?.first_name || 'Unknown'
+        }
+      }
     } else if (r.issued_to_type === 'staff') {
       const staffMember = allStaff.find(s => s._id === r.issued_to_id)
       issuedToName = typeof staffMember === 'string' ? staffMember : staffMember?.full_name || staffMember?.first_name || 'Unknown'
@@ -117,7 +127,17 @@ export default function IssueItemPage() {
         let name = 'Unknown'
         if (row.original.issued_to_type === 'student') {
           const student = allStudents.find(s => s._id === row.original.issued_to_id)
-          name = typeof student === 'string' ? student : student?.full_name || student?.first_name || 'Unknown'
+          if (student) {
+            if (typeof student === 'string') {
+              name = student
+            } else if (student?.name) {
+              const firstName = student.name.first || ''
+              const lastName = student.name.last || ''
+              name = firstName || lastName ? `${firstName} ${lastName}`.trim() : 'Unknown'
+            } else {
+              name = student?.full_name || student?.first_name || 'Unknown'
+            }
+          }
         } else if (row.original.issued_to_type === 'staff') {
           const staffMember = allStaff.find(s => s._id === row.original.issued_to_id)
           name = typeof staffMember === 'string' ? staffMember : staffMember?.full_name || staffMember?.first_name || 'Unknown'
@@ -192,7 +212,17 @@ export default function IssueItemPage() {
               let issuedToName = 'Unknown'
               if (r.issued_to_type === 'student') {
                 const student = allStudents.find(s => s._id === r.issued_to_id)
-                issuedToName = typeof student === 'string' ? student : student?.full_name || student?.first_name || 'Unknown'
+                if (student) {
+                  if (typeof student === 'string') {
+                    issuedToName = student
+                  } else if (student?.name) {
+                    const firstName = student.name.first || ''
+                    const lastName = student.name.last || ''
+                    issuedToName = firstName || lastName ? `${firstName} ${lastName}`.trim() : 'Unknown'
+                  } else {
+                    issuedToName = student?.full_name || student?.first_name || 'Unknown'
+                  }
+                }
               } else if (r.issued_to_type === 'staff') {
                 const staffMember = allStaff.find(s => s._id === r.issued_to_id)
                 issuedToName = typeof staffMember === 'string' ? staffMember : staffMember?.full_name || staffMember?.first_name || 'Unknown'
@@ -255,7 +285,17 @@ export default function IssueItemPage() {
           let issuedToName = 'Unknown'
           if (viewRow.issued_to_type === 'student') {
             const student = allStudents.find(s => s._id === viewRow.issued_to_id)
-            issuedToName = typeof student === 'string' ? student : student?.full_name || student?.first_name || 'Unknown'
+            if (student) {
+              if (typeof student === 'string') {
+                issuedToName = student
+              } else if (student?.name) {
+                const firstName = student.name.first || ''
+                const lastName = student.name.last || ''
+                issuedToName = firstName || lastName ? `${firstName} ${lastName}`.trim() : 'Unknown'
+              } else {
+                issuedToName = student?.full_name || student?.first_name || 'Unknown'
+              }
+            }
           } else if (viewRow.issued_to_type === 'staff') {
             const staffMember = allStaff.find(s => s._id === viewRow.issued_to_id)
             issuedToName = typeof staffMember === 'string' ? staffMember : staffMember?.full_name || staffMember?.first_name || 'Unknown'
@@ -339,7 +379,7 @@ function IssueItemForm({ initial, items, students, staff, itemsLoading, students
     if (formData.issued_to_type === 'student') {
       return students.map(s => ({
         value: s._id,
-        label: typeof s === 'string' ? s : s.full_name || s.first_name || 'Unknown',
+        label: typeof s === 'string' ? s : s?.name ? `${s.name.first || ''} ${s.name.last || ''}`.trim() : s.full_name || s.first_name || 'Unknown',
       }))
     } else {
       return staff.map(s => ({

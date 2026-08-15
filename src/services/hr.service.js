@@ -120,7 +120,7 @@ export const hrService = {
   },
 
   // ==========================================================
-  // Apply Leave
+  // Apply Leave (Staff Leave Applications)
   // ==========================================================
 
   getApplyLeaves(params = {}) {
@@ -132,7 +132,11 @@ export const hrService = {
   },
 
   createApplyLeave(payload) {
-    return apiClient.post("/hr/apply-leave", payload);
+    // Ensure status is set to pending by default
+    return apiClient.post("/hr/apply-leave", {
+      ...payload,
+      status: 'pending'
+    });
   },
 
   updateApplyLeave(id, payload) {

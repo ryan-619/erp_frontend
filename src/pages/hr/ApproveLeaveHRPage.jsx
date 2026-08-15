@@ -14,6 +14,7 @@
 // ====================================================================
 
 import { useMemo, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CalendarCheck, Clock, CircleCheck as CheckCircle2, Circle as XCircle, Check, X, Eye, FileText, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,6 +37,7 @@ import { useAsyncData } from '@/hooks/useAsyncData'
 import { hrService } from '@/services/hr.service'
 import { formatDate, initials } from '@/utils/format'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/utils'
 
 const EXPORT_COLS = [
@@ -65,6 +67,21 @@ function LeaveStatusPill({ status }) {
 
 export default function ApproveLeaveHRPage() {
   const { toast } = useToast()
+  const { role } = useAuth()
+  const navigate = useNavigate()
+  
+  // Role-based access control: Staff cannot access this page
+  useEffect(() => {
+    if (role === 'staff' || role === 'student' || role === 'parent') {
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to access this page.',
+        variant: 'destructive'
+      })
+      navigate('/dashboard')
+    }
+  }, [role, navigate, toast])
+  
   const { data: applyLeaves, isLoading, refetch } = useAsyncData(() => hrService.getApplyLeaves(), [])
   const { data: staffList, isLoading: staffLoading } = useAsyncData(() => hrService.getStaff(), [])
   const { data: leaveTypes, isLoading: typesLoading } = useAsyncData(() => hrService.getLeaveTypes(), [])
@@ -138,7 +155,7 @@ export default function ApproveLeaveHRPage() {
   const handleStatusUpdate = async (id, status) => {
     try {
       await hrService.updateApplyLeave(id, { status })
-      toast({ title: `Leave ${status}`, description: 'The leave application has been updated.' })
+      toast({ title: `Leave ${status}`, description: 'The staff leave application has been updated.' })
       refetch()
     } catch (error) {
       console.error('Failed to update leave status:', error)

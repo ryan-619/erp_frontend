@@ -93,7 +93,7 @@ export default function ClassTimetablePage() {
         setSubjectOptions(subjectRes || [])
         setTeacherOptions(teacherRes || [])
       } catch (err) {
-        console.log(err)
+        // Error handling
       }
     }
 

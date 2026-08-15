@@ -33,17 +33,7 @@ import { useAuth } from '@/context/AuthContext'
 import Sidebar from '@/components/sidebar/Sidebar'
 import { useGlobalSearch } from '@/hooks/useGlobalSearch'
 import { cn } from '@/lib/utils'
-
-
-const getDisplayName = (name) => {
-  if (typeof name === 'string') return name
-
-  if (name && typeof name === 'object') {
-    return [name.first, name.last].filter(Boolean).join(' ')
-  }
-
-  return 'User'
-}
+import { fullName } from '@/utils/format'
 
 // Highlights the matching portion of text within a result label.
 function HighlightMatch({ text, query }) {
@@ -77,7 +67,7 @@ export function Navbar({ collapsed, onToggleCollapse, onOpenMobile }) {
     handleQueryChange, handleKeyDown, selectResult, open, close, setActiveIndex,
   } = useGlobalSearch()
 
-  const displayName = getDisplayName(user?.name)
+  const displayName = fullName(user?.name)
 
   const initials = displayName
     .split(' ')

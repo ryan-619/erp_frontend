@@ -14,6 +14,7 @@
 // ====================================================================
 
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CalendarCheck, Clock, CircleCheck as CheckCircle2, Circle as XCircle, Check, X, Eye, FileText, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -32,9 +33,11 @@ import { NoData } from '@/components/NoData'
 import { useLeaveApprovals } from '@/hooks/useAttendance'
 import { studentService } from '@/services/student.service'
 import { academicsService } from '@/services/academics.service'
+import { leaveService } from '@/services/leave.service'
 import { LEAVE_STATUS_OPTIONS } from '@/constants/navigation'
 import { formatDate, initials } from '@/utils/format'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/utils'
 
 const STAGE_STYLE = {
@@ -64,6 +67,21 @@ function LeaveStatusPill({ status }) {
 
 export default function ApproveLeavePage() {
   const { toast } = useToast()
+  const { role } = useAuth()
+  const navigate = useNavigate()
+  
+  // Role-based access control: Students cannot access this page
+  useEffect(() => {
+    if (role === 'student' || role === 'parent') {
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to access this page.',
+        variant: 'destructive'
+      })
+      navigate('/dashboard')
+    }
+  }, [role, navigate, toast])
+  
   const {
     rows: filtered,
     stats,
@@ -74,8 +92,7 @@ export default function ApproveLeavePage() {
     sectionFilter, setSectionFilter,
     fromDate, setFromDate,
     toDate, setToDate,
-    approveLeave,
-    rejectLeave,
+    refetch,
   } = useLeaveApprovals()
   const [viewApp, setViewApp] = useState(null)
   const [classOptions, setClassOptions] = useState([])
@@ -95,10 +112,7 @@ export default function ApproveLeavePage() {
     Promise.all([
       academicsService.classes(),
       academicsService.sections(),
-      studentService.list({
-        page: 1,
-        limit: 100,
-      }),
+      studentService.list(), // Fetch all students without pagination
     ])
       .then(([clsRes, secRes, studentRes]) => {
         if (!mounted) return
@@ -122,11 +136,26 @@ export default function ApproveLeavePage() {
   }, [])
 
   const handleApprove = async (app) => {
-    await approveLeave(app)
+    try {
+      await leaveService.approveLeave(app._id)
+      toast({ title: 'Leave approved', description: 'Leave has been approved.' })
+      // Refetch the data
+      refetch()
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to approve leave', variant: 'destructive' })
+    }
   }
 
   const handleReject = async (app) => {
-    await rejectLeave(app)
+    try {
+      const reason = prompt('Enter rejection reason (optional):')
+      await leaveService.rejectLeave(app._id, reason || '')
+      toast({ title: 'Leave rejected', description: 'Leave has been rejected.' })
+      // Refetch the data
+      refetch()
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to reject leave', variant: 'destructive' })
+    }
   }
 
   const columns = useMemo(() => [
@@ -134,25 +163,62 @@ export default function ApproveLeavePage() {
       accessorKey: 'student_id',
       header: 'Student',
       cell: ({ row }) => {
-        const student =
-          typeof row.original.student_id === "object"
-            ? row.original.student_id
-            : studentOptions.find(
-                (s) => s._id === row.original.student_id
-              ) || {}
+        // Check if student_id is already populated (object)
+        if (typeof row.original.student_id === 'object' && row.original.student_id !== null) {
+          const student = row.original.student_id
+          const studentName = student?.name
+            ? `${student.name.first} ${student.name.last}`
+            : student?.email || 'Unknown'
+          
+          return (
+            <button className="flex items-center gap-3 text-left" onClick={() => setViewApp(row.original)}>
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {initials(studentName)}
+              </div>
+              <div>
+                <p className="font-medium hover:underline">{studentName}</p>
+                <p className="text-xs text-muted-foreground">{student.roll_number || student.email || '—'}</p>
+              </div>
+            </button>
+          )
+        }
 
-        const studentName = student?.name
-          ? `${student.name.first} ${student.name.last}`
-          : 'Unknown'
+        // If student_id is a string ID, try to find in studentOptions
+        const student = studentOptions.find(
+          (s) => s._id === row.original.student_id
+        )
 
+        if (student) {
+          const studentName = student?.name
+            ? `${student.name.first} ${student.name.last}`
+            : student?.email || 'Unknown'
+          
+          return (
+            <button className="flex items-center gap-3 text-left" onClick={() => setViewApp(row.original)}>
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                {initials(studentName)}
+              </div>
+              <div>
+                <p className="font-medium hover:underline">{studentName}</p>
+                <p className="text-xs text-muted-foreground">{student.roll_number || student.email || '—'}</p>
+              </div>
+            </button>
+          )
+        }
+
+        // Fallback: show the ID if we can't find the student
+        const studentIdStr = typeof row.original.student_id === 'string' 
+          ? row.original.student_id 
+          : row.original.student_id?._id || 'Unknown'
+        
         return (
           <button className="flex items-center gap-3 text-left" onClick={() => setViewApp(row.original)}>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-              {initials(studentName)}
+              ST
             </div>
             <div>
-              <p className="font-medium hover:underline">{studentName}</p>
-              <p className="text-xs text-muted-foreground">{student.roll_number || '—'}</p>
+              <p className="font-medium hover:underline">Student (ID: {studentIdStr?.slice(-8) || 'Unknown'})</p>
+              <p className="text-xs text-muted-foreground">Full ID: {studentIdStr || '—'}</p>
             </div>
           </button>
         )
@@ -192,13 +258,21 @@ export default function ApproveLeavePage() {
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons 
             rows={filtered.map(r => {
-              const student =
-                typeof r.student_id === "object"
-                  ? r.student_id
-                  : studentOptions.find((s) => s._id === r.student_id) || {}
-              const studentName = student?.name
-                ? `${student.name.first} ${student.name.last}`
-                : 'Unknown'
+              let studentName = 'Unknown'
+              
+              if (typeof r.student_id === 'object' && r.student_id !== null) {
+                const student = r.student_id
+                studentName = student?.name
+                  ? `${student.name.first} ${student.name.last}`
+                  : student?.email || 'Unknown'
+              } else {
+                const student = studentOptions.find((s) => s._id === r.student_id)
+                if (student) {
+                  studentName = student?.name
+                    ? `${student.name.first} ${student.name.last}`
+                    : student?.email || 'Unknown'
+                }
+              }
 
               return {
                 ...r,
@@ -276,16 +350,22 @@ export default function ApproveLeavePage() {
         }
       >
         {viewApp ? (() => {
-          const student =
-            typeof viewApp.student_id === "object"
-              ? viewApp.student_id
-              : studentOptions.find(
-                  (s) => s._id === viewApp.student_id
-                ) || {}
+          let studentName = 'Unknown'
+          let student = {}
           
-          const studentName = student?.name
-            ? `${student.name.first} ${student.name.last}`
-            : 'Unknown'
+          if (typeof viewApp.student_id === 'object' && viewApp.student_id !== null) {
+            student = viewApp.student_id
+            studentName = student?.name
+              ? `${student.name.first} ${student.name.last}`
+              : student?.email || 'Unknown'
+          } else {
+            student = studentOptions.find((s) => s._id === viewApp.student_id) || {}
+            if (student) {
+              studentName = student?.name
+                ? `${student.name.first} ${student.name.last}`
+                : student?.email || 'Unknown'
+            }
+          }
 
           return (
             <div className="space-y-6">
@@ -295,7 +375,7 @@ export default function ApproveLeavePage() {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold">{studentName}</p>
-                  <p className="text-xs text-muted-foreground">{student.admission_no || student.roll_number || '—'} · {classMap[viewApp.class_id]?.class_name || 'N/A'}</p>
+                  <p className="text-xs text-muted-foreground">{student?.roll_number || student?.email || '—'} · {classMap[viewApp.class_id]?.class_name || 'N/A'}</p>
                 </div>
                 <LeaveStatusPill status={viewApp.status} />
               </div>

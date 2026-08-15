@@ -23,13 +23,28 @@ import Breadcrumbs from '@/components/breadcrumbs/Breadcrumbs'
 import PageHeader from '@/components/PageHeader'
 import RoleBadge from '@/components/common/RoleBadge'
 import { useAuth } from '@/context/AuthContext'
-import { initials } from '@/utils/format'
+import { initials, fullName, formatDate } from '@/utils/format'
 
 export default function ProfilePage() {
   const { user } = useAuth()
-  const name = user?.name || 'Alex Morgan'
-  const email = user?.email || 'alex@scholaria.io'
-  const role = user?.role || 'super_admin'
+  
+  if (!user) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <Breadcrumbs items={[{ label: 'Home', to: '/dashboard' }, { label: 'Profile' }]} />
+        <PageHeader title="My Profile" description="View and update your personal information." />
+        <div className="text-center py-12 text-muted-foreground">Please log in to view your profile</div>
+      </div>
+    )
+  }
+  
+  const name = fullName(user?.name) || ''
+  const email = user?.email || ''
+  const role = user?.role || ''
+  
+  // Parse name object for first/last name inputs
+  const firstName = typeof user?.name === 'object' ? user.name.first : (user?.name || '').split(' ')[0] || ''
+  const lastName = typeof user?.name === 'object' ? user.name.last : (user?.name || '').split(' ').slice(1).join(' ') || ''
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -52,11 +67,11 @@ export default function ProfilePage() {
             <p className="text-sm text-muted-foreground">{email}</p>
             <div className="mt-3 flex justify-center"><RoleBadge role={role} /></div>
             <div className="mt-6 space-y-3 text-left text-sm">
-              <div className="flex items-center gap-3 text-muted-foreground"><Mail className="h-4 w-4" /> {email}</div>
-              <div className="flex items-center gap-3 text-muted-foreground"><Phone className="h-4 w-4" /> +1 (555) 014-2231</div>
-              <div className="flex items-center gap-3 text-muted-foreground"><MapPin className="h-4 w-4" /> Austin, TX</div>
-              <div className="flex items-center gap-3 text-muted-foreground"><Calendar className="h-4 w-4" /> Joined Jan 2025</div>
-              <div className="flex items-center gap-3 text-muted-foreground"><Shield className="h-4 w-4" /> 2FA enabled</div>
+              <div className="flex items-center gap-3 text-muted-foreground"><Mail className="h-4 w-4" /> {email || '—'}</div>
+              <div className="flex items-center gap-3 text-muted-foreground"><Phone className="h-4 w-4" /> {user?.mobile || '—'}</div>
+              <div className="flex items-center gap-3 text-muted-foreground"><MapPin className="h-4 w-4" /> {user?.address || '—'}</div>
+              <div className="flex items-center gap-3 text-muted-foreground"><Calendar className="h-4 w-4" /> {user?.admission_date ? formatDate(user.admission_date) : '—'}</div>
+              <div className="flex items-center gap-3 text-muted-foreground"><Shield className="h-4 w-4" /> {user?.status || 'active'}</div>
             </div>
           </CardContent>
         </Card>
@@ -70,13 +85,13 @@ export default function ProfilePage() {
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor="fn">First name</Label><Input id="fn" defaultValue="Alex" /></div>
-            <div className="space-y-2"><Label htmlFor="ln">Last name</Label><Input id="ln" defaultValue="Morgan" /></div>
+            <div className="space-y-2"><Label htmlFor="fn">First name</Label><Input id="fn" defaultValue={firstName} /></div>
+            <div className="space-y-2"><Label htmlFor="ln">Last name</Label><Input id="ln" defaultValue={lastName} /></div>
             <div className="space-y-2"><Label htmlFor="em">Email</Label><Input id="em" type="email" defaultValue={email} /></div>
-            <div className="space-y-2"><Label htmlFor="ph">Phone</Label><Input id="ph" defaultValue="+1 (555) 014-2231" /></div>
-            <div className="space-y-2 sm:col-span-2"><Label htmlFor="bio">Bio</Label><Input id="bio" placeholder="Tell us about yourself" /></div>
+            <div className="space-y-2"><Label htmlFor="ph">Phone</Label><Input id="ph" defaultValue={user?.mobile || ''} /></div>
+            <div className="space-y-2 sm:col-span-2"><Label htmlFor="bio">Bio</Label><Input id="bio" placeholder="Tell us about yourself" defaultValue={user?.bio || ''} /></div>
             <div className="space-y-2"><Label htmlFor="role">Role</Label><Input id="role" disabled defaultValue={role} /></div>
-            <div className="space-y-2"><Label htmlFor="inst">Institution</Label><Input id="inst" disabled defaultValue="Scholaria Platform" /></div>
+            <div className="space-y-2"><Label htmlFor="inst">Institution</Label><Input id="inst" disabled defaultValue={user?.class_name || ''} /></div>
           </CardContent>
         </Card>
       </div>

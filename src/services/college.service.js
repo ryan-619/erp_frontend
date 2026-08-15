@@ -2,10 +2,6 @@ import apiClient from "./api";
 
 
 
-
-console.log("College Service Loaded");
-
-
 export const collegeService = {
   list(params = {}) {
     return apiClient.get("/college/colleges", { params });
@@ -20,7 +16,6 @@ export const collegeService = {
   },
 
   create(payload) {
-  console.log("Calling:", "/college/colleges");
   return apiClient.post("/college/colleges", payload);
 },
 

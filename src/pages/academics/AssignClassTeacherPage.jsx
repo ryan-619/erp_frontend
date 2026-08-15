@@ -71,7 +71,7 @@ export default function AssignClassTeacherPage() {
         setSectionOptions(sectionRes || [])
         setTeacherOptions(teacherRes || [])
       } catch (err) {
-        console.log(err)
+        // Error handling
       }
     }
 
