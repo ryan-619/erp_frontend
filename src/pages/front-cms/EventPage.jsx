@@ -13,8 +13,8 @@
 // Never call Axios directly from this page.
 // ====================================================================
 
-import { useMemo, useState } from 'react'
-import { Calendar, Eye, Pencil, Trash2 } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { Calendar, Eye, Pencil, Trash2, Loader2, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,6 +52,10 @@ export default function EventPage() {
   const [editRow, setEditRow] = useState(null)
   const [viewRow, setViewRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
+  
+  // Loading states for async operations
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const rows = events || []
 
@@ -66,15 +70,35 @@ export default function EventPage() {
     total: rows.length,
   }), [rows])
 
+  // Table columns with image thumbnail
   const columns = useMemo(() => [
+    {
+      accessorKey: 'image',
+      header: 'Image',
+      cell: ({ row }) => (
+        <div className="h-16 w-24 overflow-hidden rounded-lg bg-muted">
+          {row.original.image ? (
+            <img 
+              src={row.original.image} 
+              alt={row.original.event_title || 'Event'} 
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none'
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <ImageIcon className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+      ),
+    },
     {
       accessorKey: 'event_title',
       header: 'Event',
       cell: ({ row }) => (
         <button className="flex items-center gap-3 text-left" onClick={() => setViewRow(row.original)}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Calendar className="h-4 w-4" />
-          </div>
           <div className="flex flex-col">
             <span className="font-medium hover:underline">{row.original.event_title || 'Unnamed'}</span>
             <span className="text-xs text-muted-foreground">{row.original.event_date ? formatDate(row.original.event_date) : 'No date'}</span>
@@ -93,7 +117,9 @@ export default function EventPage() {
     { label: 'Delete', icon: Trash2, variant: 'destructive', onClick: () => setDeleteRow(r) },
   ]
 
+  // Handle save (create/update) with loading state
   const handleSave = async (payload, file, id) => {
+    setIsSaving(true)
     try {
       if (id) {
         await frontCmsService.updateEvent(id, payload)
@@ -108,10 +134,14 @@ export default function EventPage() {
     } catch (error) {
       console.error('Failed to save event:', error)
       toast({ title: 'Failed to save event', variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
+  // Handle delete with loading state
   const handleDelete = async (id) => {
+    setIsDeleting(true)
     try {
       await frontCmsService.deleteEvent(id)
       toast({ title: 'Event deleted successfully' })
@@ -120,6 +150,8 @@ export default function EventPage() {
     } catch (error) {
       console.error('Failed to delete event:', error)
       toast({ title: 'Failed to delete event', variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -162,29 +194,50 @@ export default function EventPage() {
             <DialogTitle>{editRow ? 'Edit Event' : 'Add Event'}</DialogTitle>
             <DialogDescription>{editRow ? 'Update event details' : 'Add a new event'}</DialogDescription>
           </DialogHeader>
-          <EventForm initial={editRow} onSubmit={(payload, file) => handleSave(payload, file, editRow?._id)} onCancel={() => { setAddOpen(false); setEditRow(null) }} />
+          <EventForm initial={editRow} onSubmit={(payload, file) => handleSave(payload, file, editRow?._id)} onCancel={() => { setAddOpen(false); setEditRow(null) }} isSaving={isSaving} />
         </DialogContent>
       </Dialog>
 
+      {/* View drawer with full image display */}
       <Drawer open={!!viewRow} onOpenChange={(o) => !o && setViewRow(null)} title="Event Details" width="sm:max-w-md" footer={<Button variant="outline" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && (
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-            {[
-              { label: 'Event Title', value: viewRow.event_title || '—' },
-              { label: 'Event Date', value: viewRow.event_date ? formatDate(viewRow.event_date) : '—' },
-              { label: 'Description', value: viewRow.description || '—' },
-              { label: 'Image', value: viewRow.image ? 'Uploaded' : '—' },
-              { label: 'Created', value: formatDate(viewRow.createdAt) },
-            ].map((f) => (
-              <div key={f.label} className="space-y-0.5">
-                <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
-                <dd className="text-sm font-medium">{f.value}</dd>
+          <div className="space-y-6">
+            {viewRow.image && (
+              <div className="space-y-2">
+                <dt className="text-xs font-medium text-muted-foreground">Event Image</dt>
+                <div className="overflow-hidden rounded-lg border">
+                  <img 
+                    src={viewRow.image} 
+                    alt={viewRow.event_title || 'Event'} 
+                    className="w-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none'
+                    }}
+                  />
+                </div>
               </div>
-            ))}
-          </dl>
+            )}
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+              {[
+                { label: 'Event Title', value: viewRow.event_title || '—' },
+                { label: 'Event Date', value: viewRow.event_date ? formatDate(viewRow.event_date) : '—' },
+                { label: 'Created', value: formatDate(viewRow.createdAt) },
+              ].map((f) => (
+                <div key={f.label} className="space-y-0.5">
+                  <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
+                  <dd className="text-sm font-medium">{f.value}</dd>
+                </div>
+              ))}
+              <div className="col-span-full space-y-0.5">
+                <dt className="text-xs font-medium text-muted-foreground">Description</dt>
+                <dd className="text-sm font-medium whitespace-pre-wrap">{viewRow.description || '—'}</dd>
+              </div>
+            </dl>
+          </div>
         )}
       </Drawer>
 
+      {/* Delete confirmation dialog with loading state */}
       <Dialog open={!!deleteRow} onOpenChange={(o) => !o && setDeleteRow(null)}>
         <DialogContent>
           <DialogHeader>
@@ -192,8 +245,17 @@ export default function EventPage() {
             <DialogDescription>Are you sure you want to delete this event? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteRow(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => handleDelete(deleteRow._id)}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteRow(null)} disabled={isDeleting}>Cancel</Button>
+            <Button variant="destructive" onClick={() => handleDelete(deleteRow._id)} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -201,24 +263,50 @@ export default function EventPage() {
   )
 }
 
-function EventForm({ initial, onSubmit, onCancel }) {
+// Event form with image preview and loading state
+function EventForm({ initial, onSubmit, onCancel, isSaving }) {
   const [formData, setFormData] = useState({
     event_title: '', event_date: '', description: '',
   })
   const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
 
-  useState(() => {
+  // Initialize form based on edit/add mode
+  useEffect(() => {
     if (initial) {
       setFormData({
-        event_title: initial.event_title || '', event_date: initial.event_date ? initial.event_date.split('T')[0] : '', description: initial.description || '',
+        event_title: initial.event_title || '', 
+        event_date: initial.event_date ? initial.event_date.split('T')[0] : '', 
+        description: initial.description || '',
       })
+      setPreviewUrl(initial.image || null)
     } else {
       setFormData({
-        event_title: '', event_date: new Date().toISOString().split('T')[0], description: '',
+        event_title: '', 
+        event_date: new Date().toISOString().split('T')[0], 
+        description: '',
       })
+      setPreviewUrl(null)
     }
   }, [initial])
 
+  // Handle file selection with preview
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      const objectUrl = URL.createObjectURL(selectedFile)
+      setPreviewUrl(objectUrl)
+    }
+  }
+
+  // Remove selected image
+  const handleRemoveImage = () => {
+    setFile(null)
+    setPreviewUrl(null)
+  }
+
+  // Submit form
   const handleSubmit = (e) => {
     e.preventDefault()
     onSubmit(formData, file)
@@ -240,11 +328,57 @@ function EventForm({ initial, onSubmit, onCancel }) {
       </div>
       <div>
         <Label htmlFor="image">Image</Label>
-        <Input id="image" type="file" onChange={(e) => setFile(e.target.files[0])} accept="image/*" />
+        <div className="space-y-3">
+          {/* Image preview */}
+          {previewUrl && (
+            <div className="relative overflow-hidden rounded-lg border">
+              <img 
+                src={previewUrl} 
+                alt="Preview" 
+                className="h-48 w-full object-cover"
+              />
+              {!initial && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute right-2 top-2"
+                  onClick={handleRemoveImage}
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
+          )}
+          {/* File input */}
+          {!initial && (
+            <Input 
+              id="image" 
+              type="file" 
+              onChange={handleFileChange} 
+              accept="image/*" 
+            />
+          )}
+          {initial && (
+            <p className="text-xs text-muted-foreground">
+              To change the image, delete this event and create a new one.
+            </p>
+          )}
+        </div>
       </div>
+      {/* Form footer with loading state */}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">Save</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>Cancel</Button>
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save'
+          )}
+        </Button>
       </DialogFooter>
     </form>
   )

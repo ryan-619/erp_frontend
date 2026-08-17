@@ -13,7 +13,7 @@
 // Never call Axios directly from this page.
 // ====================================================================
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { FileText, Eye, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -207,7 +207,7 @@ function PageForm({ initial, onSubmit, onCancel }) {
     page_title: '', slug: '', content: '', meta_title: '', meta_description: '',
   })
 
-  useState(() => {
+  useEffect(() => {
     if (initial) {
       setFormData({
         page_title: initial.page_title || '', slug: initial.slug || '', content: initial.content || '', meta_title: initial.meta_title || '', meta_description: initial.meta_description || '',

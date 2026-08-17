@@ -13,7 +13,7 @@
 // Never call Axios directly from this page.
 // ====================================================================
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Menu, Eye, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -208,7 +208,7 @@ function MenuForm({ initial, onSubmit, onCancel }) {
     menu_name: '', link: '', parent_id: '', order: 0, menu_type: '',
   })
 
-  useState(() => {
+  useEffect(() => {
     if (initial) {
       setFormData({
         menu_name: initial.menu_name || '', link: initial.link || '', parent_id: initial.parent_id || '', order: initial.order || 0, menu_type: initial.menu_type || '',

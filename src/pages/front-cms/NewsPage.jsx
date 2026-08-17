@@ -13,8 +13,8 @@
 // Never call Axios directly from this page.
 // ====================================================================
 
-import { useMemo, useState } from 'react'
-import { Newspaper, Eye, Pencil, Trash2 } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { Newspaper, Eye, Pencil, Trash2, Loader2, Image as ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,6 +52,10 @@ export default function NewsPage() {
   const [editRow, setEditRow] = useState(null)
   const [viewRow, setViewRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
+  
+  // Loading states for async operations
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const rows = news || []
 
@@ -66,15 +70,36 @@ export default function NewsPage() {
     total: rows.length,
   }), [rows])
 
+  // Table columns with image thumbnail
   const columns = useMemo(() => [
+    {
+      accessorKey: 'image',
+      header: 'Image',
+      cell: ({ row }) => (
+        <div className="h-16 w-24 overflow-hidden rounded-lg bg-muted">
+          {row.original.image ? (
+            <img 
+              src={row.original.image} 
+              alt={row.original.title || 'News'} 
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                // Hide image if it fails to load
+                e.target.style.display = 'none'
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <ImageIcon className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+      ),
+    },
     {
       accessorKey: 'title',
       header: 'News',
       cell: ({ row }) => (
         <button className="flex items-center gap-3 text-left" onClick={() => setViewRow(row.original)}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Newspaper className="h-4 w-4" />
-          </div>
           <div className="flex flex-col">
             <span className="font-medium hover:underline">{row.original.title || 'Unnamed'}</span>
             <span className="text-xs text-muted-foreground">{row.original.author || 'No author'}</span>
@@ -93,7 +118,9 @@ export default function NewsPage() {
     { label: 'Delete', icon: Trash2, variant: 'destructive', onClick: () => setDeleteRow(r) },
   ]
 
+  // Handle save (create/update) with loading state
   const handleSave = async (payload, file, id) => {
+    setIsSaving(true)
     try {
       if (id) {
         await frontCmsService.updateNews(id, payload)
@@ -108,10 +135,14 @@ export default function NewsPage() {
     } catch (error) {
       console.error('Failed to save news:', error)
       toast({ title: 'Failed to save news', variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
+  // Handle delete with loading state
   const handleDelete = async (id) => {
+    setIsDeleting(true)
     try {
       await frontCmsService.deleteNews(id)
       toast({ title: 'News deleted successfully' })
@@ -120,6 +151,8 @@ export default function NewsPage() {
     } catch (error) {
       console.error('Failed to delete news:', error)
       toast({ title: 'Failed to delete news', variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -162,30 +195,52 @@ export default function NewsPage() {
             <DialogTitle>{editRow ? 'Edit News' : 'Add News'}</DialogTitle>
             <DialogDescription>{editRow ? 'Update news details' : 'Add a new news article'}</DialogDescription>
           </DialogHeader>
-          <NewsForm initial={editRow} onSubmit={(payload, file) => handleSave(payload, file, editRow?._id)} onCancel={() => { setAddOpen(false); setEditRow(null) }} />
+          <NewsForm initial={editRow} onSubmit={(payload, file) => handleSave(payload, file, editRow?._id)} onCancel={() => { setAddOpen(false); setEditRow(null) }} isSaving={isSaving} />
         </DialogContent>
       </Dialog>
 
+      {/* View drawer with full image display */}
       <Drawer open={!!viewRow} onOpenChange={(o) => !o && setViewRow(null)} title="News Details" width="sm:max-w-md" footer={<Button variant="outline" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && (
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-            {[
-              { label: 'Title', value: viewRow.title || '—' },
-              { label: 'Author', value: viewRow.author || '—' },
-              { label: 'Publish Date', value: viewRow.publish_date ? formatDate(viewRow.publish_date) : '—' },
-              { label: 'Image', value: viewRow.image ? 'Uploaded' : '—' },
-              { label: 'Content', value: viewRow.content || '—' },
-              { label: 'Created', value: formatDate(viewRow.createdAt) },
-            ].map((f) => (
-              <div key={f.label} className="space-y-0.5">
-                <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
-                <dd className="text-sm font-medium whitespace-pre-wrap">{f.value}</dd>
+          <div className="space-y-6">
+            {viewRow.image && (
+              <div className="space-y-2">
+                <dt className="text-xs font-medium text-muted-foreground">News Image</dt>
+                <div className="overflow-hidden rounded-lg border">
+                  <img 
+                    src={viewRow.image} 
+                    alt={viewRow.title || 'News'} 
+                    className="w-full object-cover"
+                    onError={(e) => {
+                      // Hide image if it fails to load
+                      e.target.style.display = 'none'
+                    }}
+                  />
+                </div>
               </div>
-            ))}
-          </dl>
+            )}
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+              {[
+                { label: 'Title', value: viewRow.title || '—' },
+                { label: 'Author', value: viewRow.author || '—' },
+                { label: 'Publish Date', value: viewRow.publish_date ? formatDate(viewRow.publish_date) : '—' },
+                { label: 'Created', value: formatDate(viewRow.createdAt) },
+              ].map((f) => (
+                <div key={f.label} className="space-y-0.5">
+                  <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
+                  <dd className="text-sm font-medium">{f.value}</dd>
+                </div>
+              ))}
+              <div className="col-span-full space-y-0.5">
+                <dt className="text-xs font-medium text-muted-foreground">Content</dt>
+                <dd className="text-sm font-medium whitespace-pre-wrap">{viewRow.content || '—'}</dd>
+              </div>
+            </dl>
+          </div>
         )}
       </Drawer>
 
+      {/* Delete confirmation dialog with loading state */}
       <Dialog open={!!deleteRow} onOpenChange={(o) => !o && setDeleteRow(null)}>
         <DialogContent>
           <DialogHeader>
@@ -193,8 +248,17 @@ export default function NewsPage() {
             <DialogDescription>Are you sure you want to delete this news? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteRow(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => handleDelete(deleteRow._id)}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteRow(null)} disabled={isDeleting}>Cancel</Button>
+            <Button variant="destructive" onClick={() => handleDelete(deleteRow._id)} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -202,24 +266,54 @@ export default function NewsPage() {
   )
 }
 
-function NewsForm({ initial, onSubmit, onCancel }) {
+// News form with image preview and loading state
+function NewsForm({ initial, onSubmit, onCancel, isSaving }) {
   const [formData, setFormData] = useState({
     title: '', content: '', publish_date: '', author: '',
   })
   const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
 
-  useState(() => {
+  // Initialize form based on edit/add mode
+  useEffect(() => {
     if (initial) {
       setFormData({
-        title: initial.title || '', content: initial.content || '', publish_date: initial.publish_date ? initial.publish_date.split('T')[0] : '', author: initial.author || '',
+        title: initial.title || '', 
+        content: initial.content || '', 
+        publish_date: initial.publish_date ? initial.publish_date.split('T')[0] : '', 
+        author: initial.author || '',
       })
+      // Show existing image if available
+      setPreviewUrl(initial.image || null)
     } else {
       setFormData({
-        title: '', content: '', publish_date: new Date().toISOString().split('T')[0], author: '',
+        title: '', 
+        content: '', 
+        publish_date: new Date().toISOString().split('T')[0], // Default to today
+        author: '',
       })
+      setPreviewUrl(null)
     }
   }, [initial])
 
+  // Handle file selection with preview
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      // Create object URL for immediate preview
+      const objectUrl = URL.createObjectURL(selectedFile)
+      setPreviewUrl(objectUrl)
+    }
+  }
+
+  // Remove selected image
+  const handleRemoveImage = () => {
+    setFile(null)
+    setPreviewUrl(null)
+  }
+
+  // Submit form
   const handleSubmit = (e) => {
     e.preventDefault()
     onSubmit(formData, file)
@@ -245,11 +339,57 @@ function NewsForm({ initial, onSubmit, onCancel }) {
       </div>
       <div>
         <Label htmlFor="image">Image</Label>
-        <Input id="image" type="file" onChange={(e) => setFile(e.target.files[0])} accept="image/*" />
+        <div className="space-y-3">
+          {/* Image preview */}
+          {previewUrl && (
+            <div className="relative overflow-hidden rounded-lg border">
+              <img 
+                src={previewUrl} 
+                alt="Preview" 
+                className="h-48 w-full object-cover"
+              />
+              {!initial && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute right-2 top-2"
+                  onClick={handleRemoveImage}
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
+          )}
+          {/* File input */}
+          {!initial && (
+            <Input 
+              id="image" 
+              type="file" 
+              onChange={handleFileChange} 
+              accept="image/*" 
+            />
+          )}
+          {initial && (
+            <p className="text-xs text-muted-foreground">
+              To change the image, delete this news and create a new one.
+            </p>
+          )}
+        </div>
       </div>
+      {/* Form footer with loading state */}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">Save</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>Cancel</Button>
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save'
+          )}
+        </Button>
       </DialogFooter>
     </form>
   )

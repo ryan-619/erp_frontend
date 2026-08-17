@@ -69,6 +69,7 @@ export const certificateService = {
 
   // ─── Generated Student ID Cards ──────────────────────────────────────────────
   async getGeneratedStudentIdCards() {
+    // Fetch all generated ID cards (filtering will be done on frontend)
     return apiClient.get('/certificate/generate-id-card')
   },
   async getGeneratedStudentIdCardById(id) {

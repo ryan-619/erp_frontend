@@ -13,8 +13,8 @@
 // Never call Axios directly from this page.
 // ====================================================================
 
-import { useMemo, useState } from 'react'
-import { Image, Eye, Pencil, Trash2 } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { Image, Eye, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,6 +51,8 @@ export default function BannerPage() {
   const [editRow, setEditRow] = useState(null)
   const [viewRow, setViewRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const rows = banners || []
 
@@ -67,13 +69,32 @@ export default function BannerPage() {
 
   const columns = useMemo(() => [
     {
+      accessorKey: 'image_url',
+      header: 'Image',
+      cell: ({ row }) => (
+        <div className="h-16 w-24 overflow-hidden rounded-lg bg-muted">
+          {row.original.image_url ? (
+            <img 
+              src={row.original.image_url} 
+              alt={row.original.title || 'Banner'} 
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none'
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <Image className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
       accessorKey: 'title',
       header: 'Banner',
       cell: ({ row }) => (
         <button className="flex items-center gap-3 text-left" onClick={() => setViewRow(row.original)}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Image className="h-4 w-4" />
-          </div>
           <div className="flex flex-col">
             <span className="font-medium hover:underline">{row.original.title || 'Unnamed'}</span>
             <span className="text-xs text-muted-foreground">Order: {row.original.order || 0}</span>
@@ -93,6 +114,7 @@ export default function BannerPage() {
   ]
 
   const handleSave = async (payload, file, id) => {
+    setIsSaving(true)
     try {
       if (id) {
         await frontCmsService.updateBanner(id, payload)
@@ -107,10 +129,13 @@ export default function BannerPage() {
     } catch (error) {
       console.error('Failed to save banner:', error)
       toast({ title: 'Failed to save banner', variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleDelete = async (id) => {
+    setIsDeleting(true)
     try {
       await frontCmsService.deleteBanner(id)
       toast({ title: 'Banner deleted successfully' })
@@ -119,6 +144,8 @@ export default function BannerPage() {
     } catch (error) {
       console.error('Failed to delete banner:', error)
       toast({ title: 'Failed to delete banner', variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -161,26 +188,42 @@ export default function BannerPage() {
             <DialogTitle>{editRow ? 'Edit Banner' : 'Add Banner'}</DialogTitle>
             <DialogDescription>{editRow ? 'Update banner details' : 'Add a new banner'}</DialogDescription>
           </DialogHeader>
-          <BannerForm initial={editRow} onSubmit={(payload, file) => handleSave(payload, file, editRow?._id)} onCancel={() => { setAddOpen(false); setEditRow(null) }} />
+          <BannerForm initial={editRow} onSubmit={(payload, file) => handleSave(payload, file, editRow?._id)} onCancel={() => { setAddOpen(false); setEditRow(null) }} isSaving={isSaving} />
         </DialogContent>
       </Dialog>
 
       <Drawer open={!!viewRow} onOpenChange={(o) => !o && setViewRow(null)} title="Banner Details" width="sm:max-w-md" footer={<Button variant="outline" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && (
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-            {[
-              { label: 'Title', value: viewRow.title || '—' },
-              { label: 'Link', value: viewRow.link || '—' },
-              { label: 'Order', value: viewRow.order || 0 },
-              { label: 'Image URL', value: viewRow.image_url || '—' },
-              { label: 'Created', value: formatDate(viewRow.createdAt) },
-            ].map((f) => (
-              <div key={f.label} className="space-y-0.5">
-                <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
-                <dd className="text-sm font-medium">{f.value}</dd>
+          <div className="space-y-6">
+            {viewRow.image_url && (
+              <div className="space-y-2">
+                <dt className="text-xs font-medium text-muted-foreground">Banner Image</dt>
+                <div className="overflow-hidden rounded-lg border">
+                  <img 
+                    src={viewRow.image_url} 
+                    alt={viewRow.title || 'Banner'} 
+                    className="w-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none'
+                    }}
+                  />
+                </div>
               </div>
-            ))}
-          </dl>
+            )}
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+              {[
+                { label: 'Title', value: viewRow.title || '—' },
+                { label: 'Link', value: viewRow.link || '—' },
+                { label: 'Order', value: viewRow.order || 0 },
+                { label: 'Created', value: formatDate(viewRow.createdAt) },
+              ].map((f) => (
+                <div key={f.label} className="space-y-0.5">
+                  <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
+                  <dd className="text-sm font-medium">{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         )}
       </Drawer>
 
@@ -191,8 +234,17 @@ export default function BannerPage() {
             <DialogDescription>Are you sure you want to delete this banner? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteRow(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => handleDelete(deleteRow._id)}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteRow(null)} disabled={isDeleting}>Cancel</Button>
+            <Button variant="destructive" onClick={() => handleDelete(deleteRow._id)} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -200,23 +252,40 @@ export default function BannerPage() {
   )
 }
 
-function BannerForm({ initial, onSubmit, onCancel }) {
+function BannerForm({ initial, onSubmit, onCancel, isSaving }) {
   const [formData, setFormData] = useState({
     title: '', link: '', order: 0,
   })
   const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
 
-  useState(() => {
+  useEffect(() => {
     if (initial) {
       setFormData({
         title: initial.title || '', link: initial.link || '', order: initial.order || 0,
       })
+      setPreviewUrl(initial.image_url || null)
     } else {
       setFormData({
         title: '', link: '', order: 0,
       })
+      setPreviewUrl(null)
     }
   }, [initial])
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      const objectUrl = URL.createObjectURL(selectedFile)
+      setPreviewUrl(objectUrl)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setFile(null)
+    setPreviewUrl(null)
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -239,11 +308,55 @@ function BannerForm({ initial, onSubmit, onCancel }) {
       </div>
       <div>
         <Label htmlFor="image">Image *</Label>
-        <Input id="image" type="file" onChange={(e) => setFile(e.target.files[0])} accept="image/*" required={!initial} />
+        <div className="space-y-3">
+          {previewUrl && (
+            <div className="relative overflow-hidden rounded-lg border">
+              <img 
+                src={previewUrl} 
+                alt="Preview" 
+                className="h-48 w-full object-cover"
+              />
+              {!initial && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute right-2 top-2"
+                  onClick={handleRemoveImage}
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
+          )}
+          {!initial && (
+            <Input 
+              id="image" 
+              type="file" 
+              onChange={handleFileChange} 
+              accept="image/*" 
+              required={!previewUrl}
+            />
+          )}
+          {initial && (
+            <p className="text-xs text-muted-foreground">
+              To change the image, delete this banner and create a new one.
+            </p>
+          )}
+        </div>
       </div>
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">Save</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>Cancel</Button>
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save'
+          )}
+        </Button>
       </DialogFooter>
     </form>
   )

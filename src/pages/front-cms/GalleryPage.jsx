@@ -13,8 +13,8 @@
 // Never call Axios directly from this page.
 // ====================================================================
 
-import { useMemo, useState } from 'react'
-import { Image, Eye, Pencil, Trash2 } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { Image as ImageIcon, Eye, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,7 +38,6 @@ import { useToast } from '@/hooks/use-toast'
 const EXPORT_COLS = [
   { key: 'gallery_title', label: 'Gallery Title' },
   { key: 'category', label: 'Category' },
-  { key: 'image_url', label: 'Image URL' },
   { key: 'createdAt', label: 'Created At' },
 ]
 
@@ -51,6 +50,10 @@ export default function GalleryPage() {
   const [editRow, setEditRow] = useState(null)
   const [viewRow, setViewRow] = useState(null)
   const [deleteRow, setDeleteRow] = useState(null)
+  
+  // Loading states for async operations
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const rows = gallery || []
 
@@ -65,15 +68,35 @@ export default function GalleryPage() {
     total: rows.length,
   }), [rows])
 
+  // Table columns with image thumbnail
   const columns = useMemo(() => [
+    {
+      accessorKey: 'image_url',
+      header: 'Image',
+      cell: ({ row }) => (
+        <div className="h-16 w-24 overflow-hidden rounded-lg bg-muted">
+          {row.original.image_url ? (
+            <img 
+              src={row.original.image_url} 
+              alt={row.original.gallery_title || 'Gallery'} 
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none'
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <ImageIcon className="h-6 w-6" />
+            </div>
+          )}
+        </div>
+      ),
+    },
     {
       accessorKey: 'gallery_title',
       header: 'Gallery Item',
       cell: ({ row }) => (
         <button className="flex items-center gap-3 text-left" onClick={() => setViewRow(row.original)}>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Image className="h-4 w-4" />
-          </div>
           <div className="flex flex-col">
             <span className="font-medium hover:underline">{row.original.gallery_title || 'Unnamed'}</span>
             <span className="text-xs text-muted-foreground">{row.original.category || 'No category'}</span>
@@ -81,7 +104,6 @@ export default function GalleryPage() {
         </button>
       ),
     },
-    { accessorKey: 'image_url', header: 'Image', cell: ({ row }) => row.original.image_url ? <img src={row.original.image_url} alt="" className="h-10 w-10 rounded object-cover" /> : <span className="text-sm text-muted-foreground">—</span> },
     { accessorKey: 'createdAt', header: 'Created', cell: ({ row }) => formatDate(row.original.createdAt) },
   ], [])
 
@@ -92,7 +114,9 @@ export default function GalleryPage() {
     { label: 'Delete', icon: Trash2, variant: 'destructive', onClick: () => setDeleteRow(r) },
   ]
 
+  // Handle save (create/update) with loading state
   const handleSave = async (payload, file, id) => {
+    setIsSaving(true)
     try {
       if (id) {
         await frontCmsService.updateGallery(id, payload)
@@ -107,10 +131,14 @@ export default function GalleryPage() {
     } catch (error) {
       console.error('Failed to save gallery item:', error)
       toast({ title: 'Failed to save gallery item', variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
     }
   }
 
+  // Handle delete with loading state
   const handleDelete = async (id) => {
+    setIsDeleting(true)
     try {
       await frontCmsService.deleteGallery(id)
       toast({ title: 'Gallery item deleted successfully' })
@@ -119,6 +147,8 @@ export default function GalleryPage() {
     } catch (error) {
       console.error('Failed to delete gallery item:', error)
       toast({ title: 'Failed to delete gallery item', variant: 'destructive' })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -128,12 +158,12 @@ export default function GalleryPage() {
       <PageHeader
         title="Gallery"
         description="Manage gallery items."
-        icon={Image}
-        actions={<Button onClick={() => setAddOpen(true)}><Image className="mr-2 h-4 w-4" /> Add Gallery Item</Button>}
+        icon={ImageIcon}
+        actions={<Button onClick={() => setAddOpen(true)}><ImageIcon className="mr-2 h-4 w-4" /> Add Gallery Item</Button>}
       />
 
       <div className="grid gap-4 sm:grid-cols-1">
-        <StatCard label="Total Items" value={stats.total} icon={Image} accent="primary" />
+        <StatCard label="Total Items" value={stats.total} icon={ImageIcon} accent="primary" />
       </div>
 
       <FilterBar>
@@ -161,28 +191,46 @@ export default function GalleryPage() {
             <DialogTitle>{editRow ? 'Edit Gallery Item' : 'Add Gallery Item'}</DialogTitle>
             <DialogDescription>{editRow ? 'Update gallery item details' : 'Add a new gallery item'}</DialogDescription>
           </DialogHeader>
-          <GalleryForm initial={editRow} onSubmit={(payload, file) => handleSave(payload, file, editRow?._id)} onCancel={() => { setAddOpen(false); setEditRow(null) }} />
+          <GalleryForm initial={editRow} onSubmit={(payload, file) => handleSave(payload, file, editRow?._id)} onCancel={() => { setAddOpen(false); setEditRow(null) }} isSaving={isSaving} />
         </DialogContent>
       </Dialog>
 
+       {/* View drawer with full image display */}
       <Drawer open={!!viewRow} onOpenChange={(o) => !o && setViewRow(null)} title="Gallery Item Details" width="sm:max-w-md" footer={<Button variant="outline" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && (
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-            {[
-              { label: 'Gallery Title', value: viewRow.gallery_title || '—' },
-              { label: 'Category', value: viewRow.category || '—' },
-              { label: 'Image URL', value: viewRow.image_url || '—' },
-              { label: 'Created', value: formatDate(viewRow.createdAt) },
-            ].map((f) => (
-              <div key={f.label} className="space-y-0.5">
-                <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
-                <dd className="text-sm font-medium">{f.value}</dd>
+          <div className="space-y-6">
+            {viewRow.image_url && (
+              <div className="space-y-2">
+                <dt className="text-xs font-medium text-muted-foreground">Gallery Image</dt>
+                <div className="overflow-hidden rounded-lg border">
+                  <img 
+                    src={viewRow.image_url} 
+                    alt={viewRow.gallery_title || 'Gallery'} 
+                    className="w-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none'
+                    }}
+                  />
+                </div>
               </div>
-            ))}
-          </dl>
+            )}
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+              {[
+                { label: 'Gallery Title', value: viewRow.gallery_title || '—' },
+                { label: 'Category', value: viewRow.category || '—' },
+                { label: 'Created', value: formatDate(viewRow.createdAt) },
+              ].map((f) => (
+                <div key={f.label} className="space-y-0.5">
+                  <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
+                  <dd className="text-sm font-medium">{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         )}
       </Drawer>
 
+      {/* Delete confirmation dialog with loading state */}
       <Dialog open={!!deleteRow} onOpenChange={(o) => !o && setDeleteRow(null)}>
         <DialogContent>
           <DialogHeader>
@@ -190,8 +238,17 @@ export default function GalleryPage() {
             <DialogDescription>Are you sure you want to delete this gallery item? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteRow(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => handleDelete(deleteRow._id)}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteRow(null)} disabled={isDeleting}>Cancel</Button>
+            <Button variant="destructive" onClick={() => handleDelete(deleteRow._id)} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -199,24 +256,48 @@ export default function GalleryPage() {
   )
 }
 
-function GalleryForm({ initial, onSubmit, onCancel }) {
+// Gallery form with image preview and loading state
+function GalleryForm({ initial, onSubmit, onCancel, isSaving }) {
   const [formData, setFormData] = useState({
     gallery_title: '', category: '',
   })
   const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
 
-  useState(() => {
+  // Initialize form based on edit/add mode
+  useEffect(() => {
     if (initial) {
       setFormData({
-        gallery_title: initial.gallery_title || '', category: initial.category || '',
+        gallery_title: initial.gallery_title || '', 
+        category: initial.category || '',
       })
+      setPreviewUrl(initial.image_url || null)
     } else {
       setFormData({
-        gallery_title: '', category: '',
+        gallery_title: '', 
+        category: '',
       })
+      setPreviewUrl(null)
     }
   }, [initial])
 
+  // Handle file selection with preview
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0]
+    if (selectedFile) {
+      setFile(selectedFile)
+      const objectUrl = URL.createObjectURL(selectedFile)
+      setPreviewUrl(objectUrl)
+    }
+  }
+
+  // Remove selected image
+  const handleRemoveImage = () => {
+    setFile(null)
+    setPreviewUrl(null)
+  }
+
+  // Submit form
   const handleSubmit = (e) => {
     e.preventDefault()
     onSubmit(formData, file)
@@ -234,11 +315,58 @@ function GalleryForm({ initial, onSubmit, onCancel }) {
       </div>
       <div>
         <Label htmlFor="image">Image *</Label>
-        <Input id="image" type="file" onChange={(e) => setFile(e.target.files[0])} accept="image/*" required={!initial} />
+        <div className="space-y-3">
+          {/* Image preview */}
+          {previewUrl && (
+            <div className="relative overflow-hidden rounded-lg border">
+              <img 
+                src={previewUrl} 
+                alt="Preview" 
+                className="h-48 w-full object-cover"
+              />
+              {!initial && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="absolute right-2 top-2"
+                  onClick={handleRemoveImage}
+                >
+                  Remove
+                </Button>
+              )}
+            </div>
+          )}
+          {/* File input */}
+          {!initial && (
+            <Input 
+              id="image" 
+              type="file" 
+              onChange={handleFileChange} 
+              accept="image/*" 
+              required={!previewUrl}
+            />
+          )}
+          {initial && (
+            <p className="text-xs text-muted-foreground">
+              To change the image, delete this gallery item and create a new one.
+            </p>
+          )}
+        </div>
       </div>
+      {/* Form footer with loading state */}
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">Save</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>Cancel</Button>
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save'
+          )}
+        </Button>
       </DialogFooter>
     </form>
   )

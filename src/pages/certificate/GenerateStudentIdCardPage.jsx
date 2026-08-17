@@ -13,7 +13,7 @@
 // Never call Axios directly from this page.
 // ====================================================================
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { IdCard, Eye, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -60,9 +60,31 @@ export default function GenerateStudentIdCardPage() {
 
   const filtered = useMemo(() => rows.filter((r) => {
     const q = search.toLowerCase()
-    const student = allStudents.find(s => s._id === r.student_id)
-    const design = allDesigns.find(d => d._id === r.design_id)
-    const studentName = !student ? 'Unknown' : typeof student === 'string' ? student : student?.name ? `${student.name.first} ${student.name.last}` : 'Unknown'
+    const student = allStudents.find(s => {
+      if (!s || !r.student_id) return false
+      return s._id === r.student_id || s.id === r.student_id
+    })
+    const design = allDesigns.find(d => {
+      if (!d || !r.design_id) return false
+      return d._id === r.design_id || d.id === r.design_id
+    })
+    
+    const getStudentName = (student) => {
+      if (!student) return 'Unknown'
+      if (typeof student === 'string') return student
+      if (student?.name) {
+        if (typeof student.name === 'string') return student.name
+        if (student.name.first || student.name.last) {
+          return `${student.name.first || ''} ${student.name.last || ''}`.trim()
+        }
+      }
+      if (student?.first_name || student?.last_name) {
+        return `${student.first_name || ''} ${student.last_name || ''}`.trim()
+      }
+      return 'Unknown'
+    }
+    
+    const studentName = getStudentName(student)
     return !q || 
       studentName.toLowerCase().includes(q) ||
       (design?.layout || '').toLowerCase().includes(q)
@@ -77,8 +99,27 @@ export default function GenerateStudentIdCardPage() {
       accessorKey: 'student_id',
       header: 'Student',
       cell: ({ row }) => {
-        const student = allStudents.find(s => s._id === row.original.student_id)
-        const studentName = !student ? 'Unknown' : typeof student === 'string' ? student : student?.name ? `${student.name.first} ${student.name.last}` : 'Unknown'
+        const student = allStudents.find(s => {
+          if (!s || !row.original.student_id) return false
+          return s._id === row.original.student_id || s.id === row.original.student_id
+        })
+        
+        const getStudentName = (student) => {
+          if (!student) return 'Unknown'
+          if (typeof student === 'string') return student
+          if (student?.name) {
+            if (typeof student.name === 'string') return student.name
+            if (student.name.first || student.name.last) {
+              return `${student.name.first || ''} ${student.name.last || ''}`.trim()
+            }
+          }
+          if (student?.first_name || student?.last_name) {
+            return `${student.first_name || ''} ${student.last_name || ''}`.trim()
+          }
+          return 'Unknown'
+        }
+        
+        const studentName = getStudentName(student)
         return (
           <button className="flex items-center gap-3 text-left" onClick={() => setViewRow(row.original)}>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -93,7 +134,10 @@ export default function GenerateStudentIdCardPage() {
       accessorKey: 'design_id',
       header: 'Design',
       cell: ({ row }) => {
-        const design = allDesigns.find(d => d._id === row.original.design_id)
+        const design = allDesigns.find(d => {
+          if (!d || !row.original.design_id) return false
+          return d._id === row.original.design_id || d.id === row.original.design_id
+        })
         return <span className="text-sm">{design?.layout || 'Unknown'}</span>
       },
     },
@@ -157,9 +201,31 @@ export default function GenerateStudentIdCardPage() {
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons 
             rows={filtered.map(r => {
-              const student = allStudents.find(s => s._id === r.student_id)
-              const design = allDesigns.find(d => d._id === r.design_id)
-              const studentName = !student ? 'Unknown' : typeof student === 'string' ? student : student?.name ? `${student.name.first} ${student.name.last}` : 'Unknown'
+              const student = allStudents.find(s => {
+                if (!s || !r.student_id) return false
+                return s._id === r.student_id || s.id === r.student_id
+              })
+              const design = allDesigns.find(d => {
+                if (!d || !r.design_id) return false
+                return d._id === r.design_id || d.id === r.design_id
+              })
+              
+              const getStudentName = (student) => {
+                if (!student) return 'Unknown'
+                if (typeof student === 'string') return student
+                if (student?.name) {
+                  if (typeof student.name === 'string') return student.name
+                  if (student.name.first || student.name.last) {
+                    return `${student.name.first || ''} ${student.name.last || ''}`.trim()
+                  }
+                }
+                if (student?.first_name || student?.last_name) {
+                  return `${student.first_name || ''} ${student.last_name || ''}`.trim()
+                }
+                return 'Unknown'
+              }
+              
+              const studentName = getStudentName(student)
               return {
                 ...r,
                 student_name: studentName,
@@ -185,7 +251,7 @@ export default function GenerateStudentIdCardPage() {
       )}
 
       <Dialog open={addOpen || !!editRow} onOpenChange={(o) => { if (!o) { setAddOpen(false); setEditRow(null) } }}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editRow ? 'Edit ID Card' : 'Generate ID Card'}</DialogTitle>
             <DialogDescription>{editRow ? 'Update ID card details' : 'Generate a new student ID card'}</DialogDescription>
@@ -195,26 +261,20 @@ export default function GenerateStudentIdCardPage() {
       </Dialog>
 
       <Drawer open={!!viewRow} onOpenChange={(o) => !o && setViewRow(null)} title="ID Card Details" width="sm:max-w-md" footer={<Button variant="outline" onClick={() => setViewRow(null)}>Close</Button>}>
-        {viewRow && (() => {
-          const student = allStudents.find(s => s._id === viewRow.student_id)
-          const design = allDesigns.find(d => d._id === viewRow.design_id)
-          const studentName = !student ? 'Unknown' : typeof student === 'string' ? student : student?.name ? `${student.name.first} ${student.name.last}` : 'Unknown'
-          return (
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-              {[
-                { label: 'Student', value: studentName },
-                { label: 'Design', value: design?.layout || 'Unknown' },
-                { label: 'Generated Date', value: viewRow.generated_date ? formatDate(viewRow.generated_date) : '—' },
-                { label: 'Created', value: formatDate(viewRow.createdAt) },
-              ].map((f) => (
-                <div key={f.label} className="space-y-0.5">
-                  <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
-                  <dd className="text-sm font-medium">{f.value}</dd>
-                </div>
-              ))}
-            </dl>
-          )
-        })()}
+        {viewRow && (
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            {[
+              { label: 'ID', value: viewRow._id || '—' },
+              { label: 'Created', value: formatDate(viewRow.createdAt) },
+              { label: 'Updated', value: formatDate(viewRow.updatedAt) },
+            ].map((f) => (
+              <div key={f.label} className="space-y-0.5">
+                <dt className="text-xs font-medium text-muted-foreground">{f.label}</dt>
+                <dd className="text-sm font-medium">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </Drawer>
 
       <Dialog open={!!deleteRow} onOpenChange={(o) => !o && setDeleteRow(null)}>
@@ -238,7 +298,7 @@ function GenerateForm({ initial, designs, students, designsLoading, studentsLoad
     student_id: '', design_id: '', generated_date: '',
   })
 
-  useState(() => {
+  useEffect(() => {
     if (initial) {
       setFormData({
         student_id: initial.student_id || '', design_id: initial.design_id || '', generated_date: initial.generated_date ? initial.generated_date.split('T')[0] : '',
@@ -252,13 +312,32 @@ function GenerateForm({ initial, designs, students, designsLoading, studentsLoad
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSubmit(formData)
+    
+    // Send as regular JSON according to backend expectations
+    const submitData = {
+      student_id: formData.student_id,
+      design_id: formData.design_id,
+      generated_date: formData.generated_date,
+    }
+    
+    onSubmit(submitData)
   }
 
   const getStudentName = (student) => {
     if (!student) return 'Unnamed'
     if (typeof student === 'string') return student
-    return student?.name ? `${student.name.first} ${student.name.last}` : 'Unnamed'
+    // Handle different name structures
+    if (student?.name) {
+      if (typeof student.name === 'string') return student.name
+      if (student.name.first || student.name.last) {
+        return `${student.name.first || ''} ${student.name.last || ''}`.trim()
+      }
+    }
+    // Handle direct first_name/last_name fields
+    if (student?.first_name || student?.last_name) {
+      return `${student.first_name || ''} ${student.last_name || ''}`.trim()
+    }
+    return 'Unnamed'
   }
 
   return (
@@ -285,6 +364,7 @@ function GenerateForm({ initial, designs, students, designsLoading, studentsLoad
         <Label htmlFor="generated_date">Generated Date *</Label>
         <Input id="generated_date" type="date" value={formData.generated_date} onChange={(e) => setFormData({ ...formData, generated_date: e.target.value })} required />
       </div>
+      
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit">Save</Button>

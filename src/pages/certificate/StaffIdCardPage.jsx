@@ -13,12 +13,11 @@
 // Never call Axios directly from this page.
 // ====================================================================
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { IdCard, Eye, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import Breadcrumbs from '@/components/breadcrumbs/Breadcrumbs'
 import { PageHeader } from '@/components/PageHeader'
 import { SearchBar } from '@/components/SearchBar'
@@ -40,6 +39,21 @@ const EXPORT_COLS = [
   { key: 'layout', label: 'Layout' },
   { key: 'fields_to_show', label: 'Fields to Show' },
   { key: 'createdAt', label: 'Created At' },
+]
+
+const AVAILABLE_FIELDS = [
+  { id: 'name', label: 'Name' },
+  { id: 'employee_id', label: 'Employee ID' },
+  { id: 'designation', label: 'Designation' },
+  { id: 'department', label: 'Department' },
+  { id: 'photo', label: 'Photo' },
+  { id: 'dob', label: 'Date of Birth' },
+  { id: 'blood_group', label: 'Blood Group' },
+  { id: 'phone', label: 'Phone Number' },
+  { id: 'email', label: 'Email' },
+  { id: 'address', label: 'Address' },
+  { id: 'joining_date', label: 'Joining Date' },
+  { id: 'qualification', label: 'Qualification' },
 ]
 
 export default function StaffIdCardPage() {
@@ -79,7 +93,15 @@ export default function StaffIdCardPage() {
         </button>
       ),
     },
-    { accessorKey: 'fields_to_show', header: 'Fields', cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.fields_to_show?.join(', ') || '—'}</span> },
+    { 
+      accessorKey: 'fields_to_show', 
+      header: 'Fields', 
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {row.original.fields_to_show?.map(f => AVAILABLE_FIELDS.find(af => af.id === f)?.label || f).join(', ') || '—'}
+        </span>
+      )
+    },
     { accessorKey: 'createdAt', header: 'Created', cell: ({ row }) => formatDate(row.original.createdAt) },
   ], [])
 
@@ -168,8 +190,7 @@ export default function StaffIdCardPage() {
           <dl className="grid grid-cols-1 gap-x-6 gap-y-4">
             {[
               { label: 'Layout', value: viewRow.layout || '—' },
-              { label: 'Fields to Show', value: viewRow.fields_to_show?.join(', ') || '—' },
-              { label: 'Template Config', value: viewRow.template_config ? JSON.stringify(viewRow.template_config, null, 2) : '—' },
+              { label: 'Fields to Show', value: viewRow.fields_to_show?.map(f => AVAILABLE_FIELDS.find(af => af.id === f)?.label || f).join(', ') || '—' },
               { label: 'Created', value: formatDate(viewRow.createdAt) },
             ].map((f) => (
               <div key={f.label} className="space-y-0.5">
@@ -199,46 +220,69 @@ export default function StaffIdCardPage() {
 
 function IdCardForm({ initial, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
-    layout: '', fields_to_show: '', template_config: '',
+    layout: 'horizontal',
+    fields_to_show: ['name', 'employee_id', 'designation', 'photo'],
   })
 
-  useState(() => {
+  useEffect(() => {
     if (initial) {
       setFormData({
-        layout: initial.layout || '', fields_to_show: initial.fields_to_show?.join(', ') || '', template_config: initial.template_config ? JSON.stringify(initial.template_config, null, 2) : '{}',
-      })
-    } else {
-      setFormData({
-        layout: '', fields_to_show: '', template_config: '{}',
+        layout: initial.layout || 'horizontal',
+        fields_to_show: initial.fields_to_show || ['name', 'employee_id', 'designation', 'photo'],
       })
     }
   }, [initial])
 
+  const handleFieldToggle = (fieldId) => {
+    setFormData(prev => ({
+      ...prev,
+      fields_to_show: prev.fields_to_show.includes(fieldId)
+        ? prev.fields_to_show.filter(f => f !== fieldId)
+        : [...prev.fields_to_show, fieldId]
+    }))
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
-    try {
-      const templateConfig = JSON.parse(formData.template_config)
-      const fieldsToShow = formData.fields_to_show.split(',').map(f => f.trim()).filter(f => f)
-      onSubmit({ layout: formData.layout, fields_to_show: fieldsToShow, template_config })
-    } catch (error) {
-      alert('Invalid JSON format for template config')
-    }
+    onSubmit({ 
+      layout: formData.layout, 
+      fields_to_show: formData.fields_to_show
+    })
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <Label htmlFor="layout">Layout *</Label>
-        <Input id="layout" value={formData.layout} onChange={(e) => setFormData({ ...formData, layout: e.target.value })} required />
+        <select 
+          id="layout" 
+          value={formData.layout} 
+          onChange={(e) => setFormData({ ...formData, layout: e.target.value })}
+          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          required
+        >
+          <option value="horizontal">Horizontal</option>
+          <option value="vertical">Vertical</option>
+        </select>
       </div>
+      
       <div>
-        <Label htmlFor="fields_to_show">Fields to Show (comma separated)</Label>
-        <Input id="fields_to_show" value={formData.fields_to_show} onChange={(e) => setFormData({ ...formData, fields_to_show: e.target.value })} placeholder="name, designation, department" />
+        <Label className="text-xs mb-2 block">Fields to Show *</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {AVAILABLE_FIELDS.map(field => (
+            <label key={field.id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={formData.fields_to_show.includes(field.id)}
+                onChange={() => handleFieldToggle(field.id)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              {field.label}
+            </label>
+          ))}
+        </div>
       </div>
-      <div>
-        <Label htmlFor="template_config">Template Config (JSON)</Label>
-        <Textarea id="template_config" value={formData.template_config} onChange={(e) => setFormData({ ...formData, template_config: e.target.value })} placeholder='{"key": "value"}' rows={6} className="font-mono text-sm" />
-      </div>
+      
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit">Save</Button>
