@@ -14,7 +14,7 @@
 // ====================================================================
 
 import { useMemo, useState, useEffect } from 'react'
-import { Plus, CalendarClock, Pencil, Trash2, Eye, BookOpen } from 'lucide-react'
+import { Plus, CalendarClock, Pencil, Trash2, Eye, BookOpen, LayoutGrid, Table } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -59,6 +59,7 @@ export default function ClassTimetablePage() {
   const [sectionOptions, setSectionOptions] = useState([])
   const [subjectOptions, setSubjectOptions] = useState([])
   const [teacherOptions, setTeacherOptions] = useState([])
+  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'table'
 
   // Fixed options for form dropdowns (users need all options to create entries)
   const FORM_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -222,6 +223,22 @@ export default function ClassTimetablePage() {
       <FilterBar>
         <SearchBar value={search} onChange={setSearch} placeholder="Search timetable…" className="max-w-sm" />
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={viewMode === 'grid' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('grid')}
+          >
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Grid View
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+          >
+            <Table className="h-4 w-4 mr-2" />
+            Table View
+          </Button>
           <ExportButtons 
             rows={rows.map(r => ({
               ...r,
@@ -241,6 +258,16 @@ export default function ClassTimetablePage() {
         <LoadingSkeleton variant="table" rows={6} cols={9} />
       ) : rows.length === 0 ? (
         <NoData title="No timetable entries found" actionLabel="Add Entry" onAction={() => setAddOpen(true)} />
+      ) : viewMode === 'grid' ? (
+        <TimetableView 
+          rows={rows} 
+          classMap={classMap} 
+          sectionMap={sectionMap} 
+          subjectMap={subjectMap} 
+          teacherMap={teacherMap}
+          onEdit={setEditRow}
+          onDelete={setDeleteRow}
+        />
       ) : (
         <DataTable
           columns={columns}
@@ -281,6 +308,92 @@ export default function ClassTimetablePage() {
 
       <DeleteDialog open={!!deleteRow} onOpenChange={(o) => !o && setDeleteRow(null)} entityName={subjectMap[deleteRow?.subject_id]?.subject_name || 'Unknown'}
         onConfirm={() => { deleteTimetable(deleteRow._id || deleteRow.id); setDeleteRow(null) }} />
+    </div>
+  )
+}
+
+function TimetableView({ rows, classMap, sectionMap, subjectMap, teacherMap, onEdit, onDelete }) {
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8]
+
+  // Group timetable entries by class and section
+  const groupedTimetables = useMemo(() => {
+    const grouped = {}
+    rows.forEach(row => {
+      const classKey = `${classMap[row.class_id]?.class_name || 'Unknown'}-${sectionMap[row.section_id]?.section_name || 'Unknown'}`
+      if (!grouped[classKey]) {
+        grouped[classKey] = []
+      }
+      grouped[classKey].push(row)
+    })
+    return grouped
+  }, [rows, classMap, sectionMap])
+
+  return (
+    <div className="space-y-6">
+      {Object.entries(groupedTimetables).map(([classKey, classRows]) => (
+        <div key={classKey} className="space-y-4">
+          <h3 className="text-lg font-semibold">{classKey}</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="border border-border bg-muted px-4 py-2 text-left font-medium">Period</th>
+                  {DAYS.map(day => (
+                    <th key={day} className="border border-border bg-muted px-4 py-2 text-center font-medium">
+                      {day}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {PERIODS.map(period => (
+                  <tr key={period}>
+                    <td className="border border-border bg-muted px-4 py-2 font-medium">
+                      Period {period}
+                    </td>
+                    {DAYS.map(day => {
+                      const entry = classRows.find(
+                        r => r.day === day && r.period === period
+                      )
+                      if (!entry) {
+                        return (
+                          <td key={day} className="border border-border px-2 py-1 min-w-[120px]">
+                            <div className="h-16"></div>
+                          </td>
+                        )
+                      }
+                      const subject = subjectMap[entry.subject_id]
+                      const teacher = teacherMap[entry.teacher_id]
+                      return (
+                        <td key={day} className="border border-border px-2 py-1 min-w-[120px]">
+                          <div 
+                            className="h-16 p-2 bg-card rounded border border-border hover:bg-accent transition-colors cursor-pointer relative group"
+                            onClick={() => onEdit(entry)}
+                          >
+                            <div className="text-xs font-semibold mb-1 line-clamp-1">
+                              {subject?.subject_name || 'Unknown'}
+                            </div>
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {teacher?.name || 'Unknown'}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {entry.start_time} - {entry.end_time}
+                            </div>
+                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Pencil className="h-3 w-3" />
+                            </div>
+                          </div>
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

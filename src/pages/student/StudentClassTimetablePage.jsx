@@ -4,7 +4,6 @@ import Breadcrumbs from '@/components/breadcrumbs/Breadcrumbs'
 import { PageHeader } from '@/components/PageHeader'
 import { SearchBar } from '@/components/SearchBar'
 import { StatCard } from '@/components/StatCard'
-import { DataTable } from '@/components/DataTable'
 import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { NoData } from '@/components/NoData'
 import { useAuth } from '@/context/AuthContext'
@@ -14,6 +13,7 @@ import { academicsService } from '@/services/academics.service'
 import apiClient from '@/services/api'
 
 const DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8]
 
 export default function StudentClassTimetablePage() {
   const { user, role } = useAuth()
@@ -163,6 +163,64 @@ export default function StudentClassTimetablePage() {
     },
   ], [subjectMap, teacherMap])
 
+  // Grid timetable component
+  const TimetableView = () => {
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className="border border-border bg-muted px-4 py-2 text-left font-medium">Period</th>
+              {DAYS_ORDER.map(day => (
+                <th key={day} className="border border-border bg-muted px-4 py-2 text-center font-medium">
+                  {day}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {PERIODS.map(period => (
+              <tr key={period}>
+                <td className="border border-border bg-muted px-4 py-2 font-medium">
+                  Period {period}
+                </td>
+                {DAYS_ORDER.map(day => {
+                  const entry = sortedTimetable.find(
+                    r => r.day === day && r.period === period
+                  )
+                  if (!entry) {
+                    return (
+                      <td key={day} className="border border-border px-2 py-1 min-w-[120px]">
+                        <div className="h-16"></div>
+                      </td>
+                    )
+                  }
+                  const subject = subjectMap[entry.subject_id]
+                  const teacher = teacherMap[entry.teacher_id]
+                  return (
+                    <td key={day} className="border border-border px-2 py-1 min-w-[120px]">
+                      <div className="h-16 p-2 bg-card rounded border border-border">
+                        <div className="text-xs font-semibold mb-1 line-clamp-1">
+                          {subject?.subject_name || 'Unknown'}
+                        </div>
+                        <div className="text-xs text-muted-foreground line-clamp-1">
+                          {teacher?.name || 'Unknown'}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {entry.start_time} - {entry.end_time}
+                        </div>
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   if (role !== 'student') {
     return (
       <div className="flex h-[70vh] items-center justify-center">
@@ -234,10 +292,7 @@ export default function StudentClassTimetablePage() {
               description={search ? "Try adjusting your search terms." : "Your class timetable has not been published yet. Please check back later."} 
             />
           ) : (
-            <DataTable
-              columns={columns}
-              data={sortedTimetable}
-            />
+            <TimetableView />
           )}
         </>
       )}
