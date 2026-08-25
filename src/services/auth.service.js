@@ -15,8 +15,10 @@
 import apiClient from './api'
 import { AUTH_ENDPOINTS, USER_ROLES } from '@/constants/navigation'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL
-const ROOT_BASE = API_BASE.replace('/api', '')
+// Mirror the fallback used in api.js so the auth module never throws at
+// import time when VITE_API_BASE_URL is not defined (e.g. same-origin deploys).
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+const ROOT_BASE = API_BASE.replace(/\/api\/?$/, '')
 
 const VALID_ROLES = Object.values(USER_ROLES)
 
