@@ -165,10 +165,10 @@ export const ROLE_DASHBOARD = {
 // Login endpoints per role (matches backend routes).
 export const AUTH_ENDPOINTS = {
   superadmin: { login: '/auth/login', signup: '/auth/signup', logout: '/auth/logout' },
-  admin: { login: '/users/admin/login', signup: '/users/admin/signup', logout: '/users/admin/login' },
-  staff: { login: '/users/staff/login', signup: '/users/staff/signup', logout: '/users/staff/login' },
-  student: { login: '/users/student/login', signup: '/users/student/signup', logout: '/users/student/login' },
-  parent: { login: '/users/parent/login', signup: '/users/parent/signup', logout: '/users/parent/login' },
+  admin: { login: '/users/admin/login', signup: '/users/admin/signup', logout: '/users/admin/logout' },
+  staff: { login: '/users/staff/login', signup: '/users/staff/signup', logout: '/users/staff/logout' },
+  student: { login: '/users/student/login', signup: '/users/student/signup', logout: '/users/student/logout' },
+  parent: { login: '/users/parent/login', signup: '/users/parent/signup', logout: '/users/parent/logout' },
 }
 
 // Signup field configuration per role — derived from backend controller validation.
@@ -207,9 +207,9 @@ export const SIGNUP_FIELDS = {
 
 // Sidebar menu visibility per role.
 export const ROLE_SIDEBAR = {
-  superadmin: ['dashboard', 'institution', 'academics', 'attendance', 'hr', 'settings-module', 'users', 'administration'],
-  admin: ['dashboard', 'students', 'academics', 'attendance', 'fees', 'hr', 'examinations', 'library', 'transport', 'hostel', 'front-office', 'homework', 'lesson-plan', 'income', 'expenses', 'inventory', 'online-exam', 'certificate', 'alumni', 'download-center', 'front-cms', 'settings-module'],
-  staff: ['dashboard', 'attendance', 'hr', 'homework', 'academics', 'examinations', 'online-exam', 'lesson-plan', 'library'],
+  superadmin: ['dashboard', 'institution', 'academics', 'attendance', 'reports', 'hr', 'settings-module', 'users', 'administration'],
+  admin: ['dashboard', 'students', 'academics', 'attendance', 'reports', 'fees', 'hr', 'examinations', 'library', 'transport', 'hostel', 'front-office', 'homework', 'lesson-plan', 'income', 'expenses', 'inventory', 'online-exam', 'certificate', 'alumni', 'download-center', 'front-cms', 'settings-module'],
+  staff: ['dashboard', 'attendance', 'reports', 'hr', 'homework', 'academics', 'examinations', 'online-exam', 'lesson-plan', 'library'],
   student: ['dashboard', 'my-profile', 'academics', 'attendance', 'examinations', 'fees', 'homework', 'download-center', 'online-exam', 'library', 'transport', 'certificate', 'notifications', 'lesson-plan'],
   parent: ['dashboard', 'students', 'attendance', 'fees', 'examinations', 'transport', 'hostel'],
 }

@@ -91,6 +91,11 @@ export function AuthProvider({ children }) {
         const userToken = data.token || data.data?.token
         const newSession = { token: userToken, user, role: user.role }
         setSession(newSession)
+        // Persist synchronously BEFORE the first authenticated request. The
+        // session useEffect runs too late, so without this fetchTenant() (and
+        // any immediate post-login fetch) would send no token → 401 → the axios
+        // interceptor would wipe the session and bounce back to /login.
+        try { sessionStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(newSession)) } catch { /* storage unavailable */ }
         await fetchTenant()
         return newSession
       } finally {
@@ -116,6 +121,7 @@ export function AuthProvider({ children }) {
           const userToken = result.token || result.data?.token
           const newSession = { token: userToken, user, role: user.role }
           setSession(newSession)
+          try { sessionStorage.setItem(STORAGE_KEYS.AUTH, JSON.stringify(newSession)) } catch { /* storage unavailable */ }
           await fetchTenant()
           return newSession
         }
@@ -144,7 +150,7 @@ export function AuthProvider({ children }) {
       user: session?.user ?? null,
       role: session?.role ?? null,
       token: session?.token ?? null,
-      isAuthenticated: Boolean(session),
+      isAuthenticated: Boolean(session?.token),
       isLoading,
       tenant,
       login,

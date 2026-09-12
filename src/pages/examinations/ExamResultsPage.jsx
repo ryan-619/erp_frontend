@@ -1,470 +1,191 @@
 // ====================================================================
 // Module: Examinations
-// Page: Exam Results
+// Page: Marks Entry (roster)
 //
-// Data Source: examinationService (GET/POST/PUT/DELETE /exam/result)
-// Backend Population: student_id, exam_group_id, subject_id
+// Pick an exam + subject + class/section → every student loads in a grid →
+// enter marks in bulk → one Save (idempotent bulk upsert). This is the
+// "view all students in bulk for the fields (marks)" workflow.
+//
+// Data Source: examination.service.js
+//   GET  /api/exam/marks-roster
+//   POST /api/exam/marks-roster
 // ====================================================================
-import { useMemo, useState } from 'react'
-import { Award, Percent, Trophy, BookOpen, Eye, Pencil, Trash2, Plus, RefreshCw } from 'lucide-react'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ClipboardList, Loader as Loader2, Save, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import DeleteDialog from '@/components/DeleteDialog'
+import { Card, CardContent } from '@/components/ui/card'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import Breadcrumbs from '@/components/breadcrumbs/Breadcrumbs'
-import { PageHeader } from '@/components/PageHeader'
-import { SearchBar } from '@/components/SearchBar'
-import { StatCard } from '@/components/StatCard'
-import { ActionDropdown } from '@/components/ActionDropdown'
-import { DataTable } from '@/components/DataTable'
-import { Drawer } from '@/components/Drawer'
-import { LoadingSkeleton } from '@/components/LoadingSkeleton'
-import { NoData } from '@/components/NoData'
-import { useAsyncData } from '@/hooks/useAsyncData'
-import { useExamResults } from '@/hooks/useExaminations'
+import { ClassSectionPicker } from '@/components/ClassSectionPicker'
 import { examinationService } from '@/services/examination.service'
 import { academicsService } from '@/services/academics.service'
-import apiClient from '@/services/api'
-import { useToast } from '@/hooks/use-toast'
+import { toast } from '@/hooks/use-toast'
+import { initials } from '@/utils/format'
 
-const getId = (val) => {
-  if (!val) return ''
-  if (typeof val === 'object') return val._id || val.id || ''
-  return String(val)
-}
+export default function ExamResultsPage() {
+  const [examGroups, setExamGroups] = useState([])
+  const [subjects, setSubjects] = useState([])
+  const [examGroupId, setExamGroupId] = useState('')
+  const [subjectId, setSubjectId] = useState('')
+  const [picker, setPicker] = useState({ class_name: '', section: '' })
 
-const calcPct = (obtained, total) => {
-  const numObtained = Number(obtained) || 0
-  const numTotal = Number(total) || 0
-  if (numTotal <= 0) return '0.00'
-  // Cap percentage at 100% if marks exceed total (for existing invalid data)
-  const pct = (numObtained / numTotal) * 100
-  return Math.min(pct, 100).toFixed(2)
-}
+  const [roster, setRoster] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
 
-const validateForm = (formData, setValidationError) => {
-  const marksObtained = Number(formData.marks_obtained)
-  const totalMarks = Number(formData.total_marks)
-  
-  if (marksObtained > totalMarks) {
-    setValidationError('Marks obtained cannot exceed total marks')
-    return false
+  // Load pickers' option lists once.
+  useEffect(() => {
+    let active = true
+    Promise.all([examinationService.getExamGroups({ limit: 500 }), academicsService.subjects({ limit: 500 })])
+      .then(([g, s]) => {
+        if (!active) return
+        setExamGroups(Array.isArray(g) ? g : g?.data || [])
+        setSubjects(Array.isArray(s) ? s : s?.data || [])
+      })
+      .catch(() => { if (active) { setExamGroups([]); setSubjects([]) } })
+    return () => { active = false }
+  }, [])
+
+  const ready = examGroupId && subjectId && picker.class_name
+
+  const load = useCallback(async () => {
+    if (!ready) { setRoster([]); return }
+    setLoading(true)
+    try {
+      const data = await examinationService.getMarksRoster({
+        exam_group_id: examGroupId, subject_id: subjectId,
+        class_name: picker.class_name, section: picker.section || undefined,
+      })
+      setRoster((data?.students || []).map((s) => ({ ...s })))
+    } catch (e) {
+      toast({ title: 'Could not load roster', description: e?.message || 'Please try again.', variant: 'destructive' })
+      setRoster([])
+    } finally {
+      setLoading(false)
+    }
+  }, [ready, examGroupId, subjectId, picker.class_name, picker.section])
+
+  useEffect(() => { load() }, [load])
+
+  const setField = (id, field, value) =>
+    setRoster((p) => p.map((s) => (s.student_id === id ? { ...s, [field]: value } : s)))
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return roster
+    return roster.filter((s) => s.name.toLowerCase().includes(q) || String(s.roll_number).toLowerCase().includes(q))
+  }, [roster, search])
+
+  const enteredCount = useMemo(
+    () => roster.filter((s) => s.marks_obtained !== '' && s.marks_obtained != null).length,
+    [roster],
+  )
+
+  const save = async () => {
+    if (!roster.length) return
+    setSaving(true)
+    try {
+      await examinationService.saveMarksRoster({
+        exam_group_id: examGroupId, subject_id: subjectId,
+        marks: roster.map((s) => ({ student_id: s.student_id, marks_obtained: s.marks_obtained, total_marks: s.total_marks })),
+      })
+      toast({ title: 'Marks saved', description: `${enteredCount} of ${roster.length} students.` })
+    } catch (e) {
+      toast({ title: 'Save failed', description: e?.message || 'Please try again.', variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
   }
-  
-  if (marksObtained < 0) {
-    setValidationError('Marks obtained cannot be negative')
-    return false
-  }
-  
-  if (totalMarks <= 0) {
-    setValidationError('Total marks must be greater than 0')
-    return false
-  }
-  
-  setValidationError('')
-  return true
-}
-
-export function ExamResultsPage() {
-  const { toast } = useToast()
-  const [viewRow, setViewRow] = useState(null)
-  const [addOpen, setAddOpen] = useState(false)
-  const [editRow, setEditRow] = useState(null)
-  const [deleteRow, setDeleteRow] = useState(null)
-
-  // Form State for Add / Edit operations
-  const [formData, setFormData] = useState({
-    exam_group_id: '',
-    student_id: '',
-    subject_id: '',
-    marks_obtained: '',
-    total_marks: '100',
-  })
-
-  // Validation state
-  const [validationError, setValidationError] = useState('')
-
-  // Hook from @/hooks/useExaminations
-  const {
-    rows,
-    allResults,
-    stats,
-    isLoading,
-    search,
-    setSearch,
-    saveResult,
-    deleteResult,
-    refetch,
-  } = useExamResults()
-
-  // Fetch backend datasets (Exam Groups, Subjects, Classes, Students) for dropdowns and display
-  const { data: rawGroups } = useAsyncData(() => examinationService.getExamGroups(), [])
-  const { data: rawSubjects } = useAsyncData(() => academicsService.subjects(), [])
-  const { data: rawClasses } = useAsyncData(() => academicsService.classes(), [])
-  const { data: rawStudents } = useAsyncData(() => apiClient.get('/students?page=1&limit=5000'), [])
-
-  const groups = useMemo(() => (Array.isArray(rawGroups?.data) ? rawGroups.data : Array.isArray(rawGroups) ? rawGroups : []), [rawGroups])
-  const subjects = useMemo(() => (Array.isArray(rawSubjects?.data) ? rawSubjects.data : Array.isArray(rawSubjects) ? rawSubjects : []), [rawSubjects])
-  const classes = useMemo(() => (Array.isArray(rawClasses?.data) ? rawClasses.data : Array.isArray(rawClasses) ? rawClasses : []), [rawClasses])
-  const students = useMemo(() => (Array.isArray(rawStudents?.data) ? rawStudents.data : Array.isArray(rawStudents) ? rawStudents : []), [rawStudents])
-
-  // ID -> Object / Display Name Maps
-  const groupMap = useMemo(() => Object.fromEntries(groups.map((x) => [getId(x), x.exam_name || x.name || 'N/A'])), [groups])
-  const subjectMap = useMemo(() => Object.fromEntries(subjects.map((x) => [getId(x), x.subject_name || x.name || 'N/A'])), [subjects])
-  const classMap = useMemo(() => Object.fromEntries(classes.map((x) => [getId(x), x.class_name || x.name || 'N/A'])), [classes])
-  const studentMap = useMemo(() => {
-    const map = {}
-    students.forEach((s) => {
-      const id = getId(s)
-      const name = s.name?.first && s.name?.last 
-        ? `${s.name.first} ${s.name.last}`
-        : s.first_name && s.last_name
-        ? `${s.first_name} ${s.last_name}`
-        : s.name || 'Unknown'
-      const className = s.class_name || s.class_id || 'N/A'
-      const section = s.section || ''
-      map[id] = {
-        name,
-        className,
-        section,
-        fullName: name,
-        classSection: section ? `${className} - ${section}` : className
-      }
-    })
-    return map
-  }, [students])
-
-  // Table Columns
-  const columns = useMemo(() => [
-    {
-      id: 'actions',
-      header: 'Action',
-      size: 48,
-      enableSorting: false,
-      cell: ({ row }) => (
-        <ActionDropdown
-          actions={[
-            { label: 'View', icon: Eye, onClick: () => setViewRow(row.original) },
-            {
-              label: 'Edit',
-              icon: Pencil,
-              onClick: () => {
-                const item = row.original
-                setEditRow(item)
-                setFormData({
-                  exam_group_id: getId(item.exam_group_id),
-                  student_id: getId(item.student_id),
-                  subject_id: getId(item.subject_id),
-                  marks_obtained: item.marks_obtained ?? '',
-                  total_marks: item.total_marks ?? '100',
-                })
-              },
-            },
-            { label: 'Delete', icon: Trash2, onClick: () => setDeleteRow(row.original), destructive: true },
-          ]}
-        />
-      ),
-    },
-    {
-      accessorKey: 'student_id',
-      header: 'Student',
-      cell: ({ row }) => {
-        const studentData = studentMap[getId(row.original.student_id)]
-        return (
-          <span className="font-medium text-foreground">
-            {studentData?.fullName || String(row.original.student_id) || 'N/A'}
-          </span>
-        )
-      },
-    },
-    {
-      accessorKey: 'class',
-      header: 'Class/Section',
-      cell: ({ row }) => {
-        const studentData = studentMap[getId(row.original.student_id)]
-        return studentData?.classSection || 'N/A'
-      },
-    },
-    {
-      accessorKey: 'exam_group_id',
-      header: 'Exam Group',
-      cell: ({ row }) => groupMap[getId(row.original.exam_group_id)] || 'N/A',
-    },
-    {
-      accessorKey: 'subject_id',
-      header: 'Subject',
-      cell: ({ row }) => subjectMap[getId(row.original.subject_id)] || 'N/A',
-    },
-    {
-      accessorKey: 'marks',
-      header: 'Marks',
-      cell: ({ row }) => `${row.original.marks_obtained ?? 0} / ${row.original.total_marks ?? 0}`,
-    },
-    {
-      accessorKey: 'percentage',
-      header: 'Percentage',
-      cell: ({ row }) => {
-        const pct = calcPct(row.original.marks_obtained, row.original.total_marks)
-        return <Badge variant={Number(pct) >= 40 ? 'default' : 'destructive'}>{pct}%</Badge>
-      },
-    },
-  ], [groupMap, subjectMap, studentMap])
-
-  // View Drawer Content
-  const viewDetails = viewRow ? [
-    { label: 'Student', value: studentMap[getId(viewRow.student_id)]?.fullName || String(viewRow.student_id) || 'N/A' },
-    { label: 'Class/Section', value: studentMap[getId(viewRow.student_id)]?.classSection || 'N/A' },
-    { label: 'Exam Group', value: groupMap[getId(viewRow.exam_group_id)] || 'N/A' },
-    { label: 'Subject', value: subjectMap[getId(viewRow.subject_id)] || 'N/A' },
-    { label: 'Marks', value: `${viewRow.marks_obtained ?? 0} / ${viewRow.total_marks ?? 0}` },
-    { label: 'Percentage', value: `${calcPct(viewRow.marks_obtained, viewRow.total_marks)}%` },
-  ] : []
 
   return (
-    <div className="space-y-6 animate-fade-in pb-10">
-      <Breadcrumbs items={[{ label: 'Home', to: '/dashboard' }, { label: 'Examinations', to: '/examinations/exam-groups' }, { label: 'Exam Results' }]} />
-
-      <PageHeader
-        title="Exam Results"
-        description="Manage student examination scores and performance metrics."
-        icon={Award}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" disabled={isLoading} onClick={refetch}>
-              <RefreshCw className={`mr-1.5 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                setEditRow(null)
-                setFormData({
-                  exam_group_id: '',
-                  student_id: '',
-                  subject_id: '',
-                  marks_obtained: '',
-                  total_marks: '100',
-                })
-                setAddOpen(true)
-              }}
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> Add Result
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Results" value={stats.total} icon={Award} accent="primary" />
-        <StatCard label="Avg Percentage" value={`${stats.avgPct}%`} icon={Percent} accent="chart2" />
-        <StatCard label="Highest Marks" value={stats.maxMarks} icon={Trophy} accent="warning" />
-        <StatCard label="Total Subjects" value={stats.totalSubjects} icon={BookOpen} accent="success" />
+    <div className="space-y-5 animate-fade-in">
+      <Breadcrumbs items={[{ label: 'Home', to: '/dashboard' }, { label: 'Examinations' }, { label: 'Marks Entry' }]} />
+      <div className="flex flex-col gap-1">
+        <h1 className="font-display text-2xl font-bold tracking-tight">Marks Entry</h1>
+        <p className="text-sm text-muted-foreground">Pick an exam, subject and class — enter marks for the whole class in one go.</p>
       </div>
 
-      <SearchBar value={search} onChange={setSearch} placeholder="Search student ID, subject..." className="max-w-sm" />
+      <Card><CardContent className="flex flex-wrap items-end gap-4 p-4">
+        <div className="min-w-[180px]">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Exam</label>
+          <Select value={examGroupId} onValueChange={setExamGroupId}>
+            <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
+            <SelectContent>
+              {examGroups.length === 0
+                ? <SelectItem value="__none" disabled>No exams found</SelectItem>
+                : examGroups.map((g) => <SelectItem key={g._id} value={g._id}>{g.exam_name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="min-w-[180px]">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Subject</label>
+          <Select value={subjectId} onValueChange={setSubjectId}>
+            <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+            <SelectContent>
+              {subjects.length === 0
+                ? <SelectItem value="__none" disabled>No subjects found</SelectItem>
+                : subjects.map((s) => <SelectItem key={s._id} value={s._id}>{s.subject_name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <ClassSectionPicker value={picker} onChange={setPicker} />
+      </CardContent></Card>
 
-      {isLoading ? (
-        <LoadingSkeleton variant="table" rows={6} cols={7} />
-      ) : rows.length === 0 ? (
-        <NoData icon={Award} title="No Results Found" description="No examination scores recorded yet. Add one to get started." actionLabel="Add First Result" onAction={() => setAddOpen(true)} />
-      ) : (
-        <DataTable columns={columns} data={rows} emptyMessage="No matching exam results found." />
+      {!ready && (
+        <Card><CardContent className="flex flex-col items-center gap-2 py-14 text-center">
+          <ClipboardList className="h-8 w-8 text-muted-foreground" />
+          <p className="text-sm font-medium">Choose exam, subject and class</p>
+          <p className="text-xs text-muted-foreground">Pick all three above to load the class and enter marks.</p>
+        </CardContent></Card>
       )}
 
-      {/* View Details Drawer */}
-      <Drawer
-        open={!!viewRow}
-        onOpenChange={(o) => !o && setViewRow(null)}
-        title="Exam Result Details"
-        description="Detailed view of student examination record"
-        width="sm:max-w-md"
-        footer={<Button variant="outline" onClick={() => setViewRow(null)}>Close</Button>}
-      >
-        <div className="space-y-4">
-          {viewDetails.map((item, idx) => (
-            <div key={idx} className="border-b pb-2 last:border-b-0">
-              <span className="text-xs font-medium text-muted-foreground block">{item.label}</span>
-              <span className="text-sm font-semibold text-foreground">{item.value}</span>
-            </div>
-          ))}
-        </div>
-      </Drawer>
+      {loading && <div className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading students…</div>}
 
-      {/* Add / Edit Result Form Drawer */}
-      <Drawer
-        open={addOpen || !!editRow}
-        onOpenChange={(o) => {
-          if (!o) {
-            setAddOpen(false)
-            setEditRow(null)
-            setValidationError('')
-          }
-        }}
-        title={editRow ? 'Edit Exam Result' : 'Add Exam Result'}
-        description={editRow ? 'Update examination score details' : 'Add new examination score record'}
-        width="sm:max-w-md"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setAddOpen(false)
-                setEditRow(null)
-                setValidationError('')
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (!validateForm(formData, setValidationError)) {
-                  return
-                }
-                saveResult(
-                  {
-                    exam_group_id: formData.exam_group_id,
-                    student_id: formData.student_id,
-                    subject_id: formData.subject_id,
-                    marks_obtained: Number(formData.marks_obtained),
-                    total_marks: Number(formData.total_marks),
-                  },
-                  editRow?._id
-                ).then(() => {
-                  setAddOpen(false)
-                  setEditRow(null)
-                  setValidationError('')
-                }).catch((error) => {
-                  setValidationError(error.message || 'Failed to save result')
-                })
-              }}
-            >
-              {editRow ? 'Update' : 'Save'}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          {validationError && (
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-2 rounded-md text-sm">
-              {validationError}
-            </div>
-          )}
-          <div>
-            <Label>Student</Label>
-            <select
-              value={formData.student_id}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  student_id: e.target.value,
-                }))
-              }
-              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Select student</option>
-              {students.map((s) => {
-                const studentName = s.name?.first && s.name?.last 
-                  ? `${s.name.first} ${s.name.last}`
-                  : s.first_name && s.last_name
-                  ? `${s.first_name} ${s.last_name}`
-                  : 'Unknown'
-                const className = s.class_name || s.class_id || 'N/A'
-                const section = s.section || ''
-                const classSection = section ? `${className} - ${section}` : className
-                return (
-                  <option key={getId(s)} value={getId(s)}>
-                    {studentName} ({classSection})
-                  </option>
-                )
-              })}
-            </select>
-          </div>
-          <div>
-            <Label>Exam Group</Label>
-            <select
-              value={formData.exam_group_id}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  exam_group_id: e.target.value,
-                }))
-              }
-              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Select exam group</option>
-              {groups.map((g) => (
-                <option key={getId(g)} value={getId(g)}>
-                  {g.exam_name || g.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <Label>Subject</Label>
-            <select
-              value={formData.subject_id}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  subject_id: e.target.value,
-                }))
-              }
-              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Select subject</option>
-              {subjects.map((s) => (
-                <option key={getId(s)} value={getId(s)}>
-                  {s.subject_name || s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Marks Obtained</Label>
-              <Input
-                type="number"
-                placeholder="0"
-                value={formData.marks_obtained}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    marks_obtained: e.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div>
-              <Label>Total Marks</Label>
-              <Input
-                type="number"
-                placeholder="100"
-                value={formData.total_marks}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    total_marks: e.target.value,
-                  }))
-                }
-              />
-            </div>
-          </div>
-        </div>
-      </Drawer>
+      {!loading && ready && roster.length === 0 && (
+        <Card><CardContent className="py-14 text-center text-sm text-muted-foreground">No students found in {picker.class_name}{picker.section ? ` · ${picker.section}` : ''}.</CardContent></Card>
+      )}
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteDialog
-        open={!!deleteRow}
-        onOpenChange={(o) => !o && setDeleteRow(null)}
-        title="Delete Exam Result"
-        description="Are you sure you want to delete this exam result? This action cannot be undone."
-        onConfirm={() => {
-          deleteResult(deleteRow._id)
-          setDeleteRow(null)
-        }}
-      />
+      {!loading && roster.length > 0 && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm"><span className="font-semibold">{roster.length} students</span> <span className="text-muted-foreground">· {enteredCount} with marks entered</span></div>
+            <div className="relative max-w-xs">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-9" placeholder="Search student…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </div>
+
+          <Card><CardContent className="divide-y p-0">
+            <div className="flex items-center gap-3 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="flex-1">Student</span>
+              <span className="w-24 text-center">Marks</span>
+              <span className="w-24 text-center">Out of</span>
+            </div>
+            {visible.map((s) => (
+              <div key={s.student_id} className="flex items-center gap-3 px-4 py-2.5">
+                <div className="flex flex-1 items-center gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{initials(s.name)}</div>
+                  <div>
+                    <p className="text-sm font-medium">{s.name}</p>
+                    <p className="text-xs text-muted-foreground">Roll {s.roll_number || '—'}</p>
+                  </div>
+                </div>
+                <Input type="number" min="0" className="w-24 text-center" value={s.marks_obtained ?? ''} onChange={(e) => setField(s.student_id, 'marks_obtained', e.target.value)} placeholder="—" />
+                <Input type="number" min="0" className="w-24 text-center" value={s.total_marks ?? ''} onChange={(e) => setField(s.student_id, 'total_marks', e.target.value)} placeholder="100" />
+              </div>
+            ))}
+          </CardContent></Card>
+
+          <div className="sticky bottom-4 flex justify-end">
+            <Button size="lg" onClick={save} disabled={saving} className="shadow-lg">
+              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving…</> : <><Save className="mr-2 h-4 w-4" /> Save Marks</>}
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
-
-export default ExamResultsPage;

@@ -131,6 +131,7 @@ export const sidebarItems = [
     roles: ['superadmin', 'admin', 'staff'],
     children: [
       { title: 'Student List', path: '/students' },
+      { title: 'Bulk Import', path: '/students/import' },
       { title: 'Student Admission', path: '/students/admissions' },
       { title: 'Student Categories', path: '/students/categories' },
       { title: 'Student House', path: '/students/houses' },
@@ -198,6 +199,18 @@ export const sidebarItems = [
       { title: 'Print Marksheet', path: '/examinations/print-marksheet', roles: ['superadmin', 'admin', 'staff'] },
       { title: 'Marks Grade', path: '/examinations/marks-grade', roles: ['superadmin', 'admin', 'staff'] },
       { title: 'Marks Division', path: '/examinations/marks-division', roles: ['superadmin', 'admin', 'staff'] },
+    ],
+  },
+  {
+    id: 'reports',
+    title: 'Reports',
+    icon: BarChart3,
+    roles: ['superadmin', 'admin', 'staff'],
+    children: [
+      { title: 'Exam Analysis', path: '/reports/exam-analysis' },
+      { title: 'Student Report', path: '/reports/students' },
+      { title: 'Fee Collection', path: '/reports/fee-collection' },
+      { title: 'Attendance Report', path: '/reports/attendance' },
     ],
   },
   {

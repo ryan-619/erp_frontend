@@ -61,6 +61,19 @@ export const attendanceService = {
     return res
   },
 
+  // ==========================================================
+  // Roster (fast "take attendance for a whole class") workflow
+  //   getRoster → every student in class/section + their mark (default present)
+  //   saveRoster → idempotent bulk upsert
+  // ==========================================================
+  async getRoster({ class_name, section, date }) {
+    return apiClient.get('/attendance/roster', { params: { class_name, section, date } })
+  },
+
+  async saveRoster(payload) {
+    return apiClient.post('/attendance/roster', payload)
+  },
+
   // Alias for getLeaves — hooks call leaves()
   async leaves(params = {}) {
     const res = await apiClient.get('/attendance/approve-leave', { params })

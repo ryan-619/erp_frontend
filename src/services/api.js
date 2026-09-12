@@ -24,7 +24,10 @@ const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 export const apiClient = axios.create({
   baseURL,
-  timeout: 15000,
+  // 45s: serverless (Vercel) cold starts must boot the function and open the
+  // MongoDB Atlas connections before the first response — that can exceed a
+  // tight timeout. Warm requests still return in ~1s.
+  timeout: 45000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -91,11 +94,13 @@ apiClient.interceptors.response.use(
 
     if (payload && typeof payload === 'object' && 'success' in payload) {
       if (!payload.success) {
-        return Promise.reject({
-          message: payload.message || 'Request failed',
-          status: response.status,
-          data: payload,
-        })
+        // A 2xx carrying { success: false } is a business-level failure.
+        // It never reaches the error interceptor below, so without this
+        // toast the page just renders its empty state and the user is
+        // told nothing at all about why their data is missing.
+        const message = payload.message || 'Request failed'
+        toast({ title: 'Request failed', description: message, variant: 'destructive' })
+        return Promise.reject({ message, status: response.status, data: payload })
       }
 
       return payload.data !== undefined ? payload.data : payload
@@ -116,8 +121,17 @@ apiClient.interceptors.response.use(
     // Show toast for common error codes (non-GET requests only to avoid
     // spamming on background fetches; login/signup show their own inline errors).
     const method = error?.config?.method?.toUpperCase()
-    const isAuthEndpoint =
-      error?.config?.url?.includes('/auth/') || error?.config?.url?.includes('/users/')
+    // Only the actual login/signup/logout routes count as "auth endpoints"
+    // (they show their own inline errors). This must NOT swallow expiry on
+    // user-management pages like /api/users/:id, which should behave like any
+    // other endpoint (toast + redirect on 401).
+    const reqUrl = error?.config?.url || ''
+    const AUTH_PATHS = ['/auth/login', '/auth/signup', '/auth/logout',
+      '/admin/login', '/admin/signup', '/admin/logout',
+      '/staff/login', '/staff/signup', '/staff/logout',
+      '/student/login', '/student/signup', '/student/logout',
+      '/parent/login', '/parent/signup', '/parent/logout']
+    const isAuthEndpoint = AUTH_PATHS.some((p) => reqUrl.includes(p))
 
     if (!isAuthEndpoint) {
       if (normalized.status === 401) {
