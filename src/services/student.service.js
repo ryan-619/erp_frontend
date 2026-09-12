@@ -186,6 +186,18 @@ export const studentService = {
   // Bulk delete: POST /api/student/bulk-delete/students with { ids: [] }
   bulkDelete: (ids) => apiClient.post('/student/bulk-delete/students', { ids }),
 
+  // Bulk CSV import: POST /api/student/import (multipart). All rows go into
+  // the chosen class/section (the CSV has no class column).
+  importCsv: (file, { class_name, section } = {}) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('class_name', class_name)
+    if (section) form.append('section', section)
+    return apiClient.post('/student/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
   // DisabledStudent CRUD: /api/student/disabled
   disabled: (params = {}) => apiClient.get('/student/disabled', { params }),
   getDisabledStudent: (id) => apiClient.get(`/student/disabled/${id}`),

@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.vercel
+
+# Local tooling & build env
+.claude/
+.env.production

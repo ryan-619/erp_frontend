@@ -14,7 +14,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { GraduationCap, Loader as Loader2, Eye, EyeOff, ShieldCheck, Users, UserCog, GraduationCap as StudentIcon, UsersRound } from 'lucide-react'
+import { GraduationCap, Loader as Loader2, Eye, EyeOff, GraduationCap as StudentIcon, UsersRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,10 +23,10 @@ import { APP_NAME, USER_ROLES, ROLE_LABELS, SIGNUP_FIELDS } from '@/constants/na
 import { toast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
+// Only self-service roles are offered here. Admin / Staff / Super Admin
+// accounts are privileged and must be provisioned by an existing
+// administrator (backend enforces this via role-guarded signup routes).
 const ROLE_OPTIONS = [
-  { value: USER_ROLES.SUPER_ADMIN, label: ROLE_LABELS.superadmin, icon: ShieldCheck },
-  { value: USER_ROLES.ADMIN, label: ROLE_LABELS.admin, icon: Users },
-  { value: USER_ROLES.STAFF, label: ROLE_LABELS.staff, icon: UserCog },
   { value: USER_ROLES.STUDENT, label: ROLE_LABELS.student, icon: StudentIcon },
   { value: USER_ROLES.PARENT, label: ROLE_LABELS.parent, icon: UsersRound },
 ]
@@ -34,7 +34,7 @@ const ROLE_OPTIONS = [
 export default function SignupPage() {
   const navigate = useNavigate()
   const { signup } = useAuth()
-  const [role, setRole] = useState(USER_ROLES.ADMIN)
+  const [role, setRole] = useState(USER_ROLES.STUDENT)
   const [showPassword, setShowPassword] = useState(false)
   const [serverError, setServerError] = useState('')
 
@@ -70,6 +70,9 @@ export default function SignupPage() {
       } else if (status === 400) {
         setServerError(e?.message || 'Please check all required fields.')
         toast({ title: 'Missing fields', description: e?.message || 'Please check all required fields.', variant: 'destructive' })
+      } else if (status === 401 || status === 403) {
+        setServerError('This account type must be created by an administrator.')
+        toast({ title: 'Not permitted', description: 'This account type must be created by an administrator.', variant: 'destructive' })
       } else if (status === 0) {
         setServerError('Unable to reach the server. Check your internet connection.')
         toast({ title: 'Network error', description: 'Unable to reach the server.', variant: 'destructive' })
@@ -101,7 +104,7 @@ export default function SignupPage() {
         <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Select Role
         </Label>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           {ROLE_OPTIONS.map((opt) => {
             const Icon = opt.icon
             const active = role === opt.value
@@ -183,7 +186,11 @@ export default function SignupPage() {
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        Staff and administrator accounts are created by your school administrator.
+      </p>
+
+      <p className="mt-4 text-center text-sm text-muted-foreground">
         Already have an account?{' '}
         <Link to="/login" className="font-semibold text-primary hover:underline">
           Sign in

@@ -306,10 +306,17 @@ export default function CollectFeesPage() {
         getStudentDisplayName={getStudentDisplayName}
         getFeeMasterDisplayName={getFeeMasterDisplayName}
         onSubmit={async (p) => {
-          await feesService.collectPayment(p)
-          toast({ title: 'Payment collected successfully' })
-          setAddOpen(false)
-          refetch()
+          // Money path: never fail silently, and never leave the drawer open
+          // on success (a second submit would duplicate the payment).
+          try {
+            await feesService.collectPayment(p)
+            toast({ title: 'Payment collected successfully' })
+            setAddOpen(false)
+            refetch()
+          } catch (e) {
+            toast({ title: 'Failed to collect payment', description: e?.message || 'The payment was not saved. Please retry.', variant: 'destructive' })
+            throw e
+          }
         }}
       />
 
@@ -324,10 +331,15 @@ export default function CollectFeesPage() {
         getStudentDisplayName={getStudentDisplayName}
         getFeeMasterDisplayName={getFeeMasterDisplayName}
         onSubmit={async (p) => {
-          await feesService.updateCollectedFee(editRow._id, p)
-          toast({ title: 'Payment record updated' })
-          setEditRow(null)
-          refetch()
+          try {
+            await feesService.updateCollectedFee(editRow._id, p)
+            toast({ title: 'Payment record updated' })
+            setEditRow(null)
+            refetch()
+          } catch (e) {
+            toast({ title: 'Failed to update payment', description: e?.message || 'The change was not saved. Please retry.', variant: 'destructive' })
+            throw e
+          }
         }}
       />
 
@@ -404,10 +416,15 @@ export default function CollectFeesPage() {
             : 'Fee Record'
         }
         onConfirm={async () => {
-          await feesService.deleteCollectedFee(deleteRow._id)
-          toast({ title: 'Payment record deleted' })
-          setDeleteRow(null)
-          refetch()
+          try {
+            await feesService.deleteCollectedFee(deleteRow._id)
+            toast({ title: 'Payment record deleted' })
+            setDeleteRow(null)
+            refetch()
+          } catch (e) {
+            toast({ title: 'Failed to delete payment', description: e?.message || 'The record was not deleted.', variant: 'destructive' })
+            throw e
+          }
         }}
       />
     </div>
@@ -437,6 +454,15 @@ function CollectFeeDrawer({
     transaction_id: initial?.transaction_id || '',
   })
 
+  // Guards a double-click from creating a duplicate payment.
+  const [submitting, setSubmitting] = useState(false)
+  const submit = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    try { await onSubmit(form) } catch { /* parent already toasted */ }
+    finally { setSubmitting(false) }
+  }
+
   useEffect(() => {
     setForm({
       student_id: initial?.student_id || '',
@@ -446,6 +472,7 @@ function CollectFeeDrawer({
       payment_mode: initial?.payment_mode || 'cash',
       transaction_id: initial?.transaction_id || '',
     })
+    setSubmitting(false)
   }, [initial, open])
 
   return (
@@ -458,12 +485,13 @@ function CollectFeeDrawer({
       footer={
         <DrawerFooter
           onCancel={() => onOpenChange(false)}
-          submitLabel={initial ? 'Save' : 'Collect'}
-          onSubmit={() => onSubmit(form)}
+          submitLabel={submitting ? 'Saving…' : initial ? 'Save' : 'Collect'}
+          submitDisabled={submitting}
+          onSubmit={submit}
         />
       }
     >
-      <form onSubmit={(e) => { e.preventDefault(); onSubmit(form) }} className="space-y-4">
+      <form onSubmit={(e) => { e.preventDefault(); submit() }} className="space-y-4">
         <FormSection columns={2}>
           <div className="space-y-1.5 sm:col-span-2">
             <Label className="text-xs">Student <span className="text-destructive">*</span></Label>

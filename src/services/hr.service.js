@@ -103,6 +103,14 @@ export const hrService = {
     return apiClient.get("/hr/staff-attendance", { params });
   },
 
+  // Roster: mark a whole day's staff attendance in bulk (idempotent).
+  getStaffRoster(params = {}) {
+    return apiClient.get("/hr/staff-attendance-roster", { params });
+  },
+  saveStaffRoster(payload) {
+    return apiClient.post("/hr/staff-attendance-roster", payload);
+  },
+
   getAttendanceById(id) {
     return apiClient.get(`/hr/staff-attendance/${id}`);
   },

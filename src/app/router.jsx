@@ -61,6 +61,11 @@ const AttendanceByDatePage = lazy(() => import('@/pages/attendance/AttendanceByD
 const ExamGroupsPage = lazy(() => import('@/pages/examinations/ExamGroupsPage'))
 const ExamSchedulePage = lazy(() => import('@/pages/examinations/ExamSchedulePage'))
 const ExamResultsPage = lazy(() => import('@/pages/examinations/ExamResultsPage'))
+const ExamAnalysisPage = lazy(() => import('@/pages/reports/ExamAnalysisPage'))
+const StudentReportPage = lazy(() => import('@/pages/reports/StudentReportPage'))
+const FeeCollectionReportPage = lazy(() => import('@/pages/reports/FeeCollectionReportPage'))
+const AttendanceReportPage = lazy(() => import('@/pages/reports/AttendanceReportPage'))
+const ChangePasswordPage = lazy(() => import('@/pages/account/ChangePasswordPage'))
 const DesignAdmitCardPage = lazy(() => import('@/pages/examinations/DesignAdmitCardPage'))
 const PrintAdmitCardPage = lazy(() => import('@/pages/examinations/PrintAdmitCardPage'))
 const DesignMarksheetPage = lazy(() => import('@/pages/examinations/DesignMarksheetPage'))
@@ -91,6 +96,9 @@ const DisableReasonsPage = lazy(() =>
 
 const BulkDeletePage = lazy(() =>
   import('@/pages/students/BulkDeletePage')
+)
+const StudentImportPage = lazy(() =>
+  import('@/pages/students/StudentImportPage')
 )
 
 
@@ -411,6 +419,11 @@ export default function AppRouter() {
             element={<StudentProtectedRoute><BulkDeletePage /></StudentProtectedRoute>}
             />
 
+            <Route
+            path="/students/import"
+            element={<StudentProtectedRoute><StudentImportPage /></StudentProtectedRoute>}
+            />
+
 
 
             
@@ -430,6 +443,13 @@ export default function AppRouter() {
             <Route path="/examinations/exam-groups" element={<StudentProtectedRoute><ExamGroupsPage /></StudentProtectedRoute>} />
             <Route path="/examinations/schedule" element={<ExamScheduleWrapper />} />
             <Route path="/examinations/results" element={<StudentProtectedRoute><ExamResultsPage /></StudentProtectedRoute>} />
+            <Route path="/reports/exam-analysis" element={<StudentProtectedRoute><ExamAnalysisPage /></StudentProtectedRoute>} />
+            <Route path="/reports/students" element={<StudentProtectedRoute><StudentReportPage /></StudentProtectedRoute>} />
+            <Route path="/reports/fee-collection" element={<StudentProtectedRoute><FeeCollectionReportPage /></StudentProtectedRoute>} />
+            <Route path="/reports/attendance" element={<StudentProtectedRoute><AttendanceReportPage /></StudentProtectedRoute>} />
+
+            {/* Account — every signed-in role can change their own password. */}
+            <Route path="/account/password" element={<StudentProtectedRoute><ChangePasswordPage /></StudentProtectedRoute>} />
             <Route path="/examinations/design-admit-card" element={<StudentProtectedRoute><DesignAdmitCardPage /></StudentProtectedRoute>} />
             <Route path="/examinations/print-admit-card" element={<StudentProtectedRoute><PrintAdmitCardPage /></StudentProtectedRoute>} />
             <Route path="/examinations/design-marksheet" element={<StudentProtectedRoute><DesignMarksheetPage /></StudentProtectedRoute>} />

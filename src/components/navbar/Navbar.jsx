@@ -5,6 +5,7 @@ import {
   ChevronsLeft,
   Command,
   CornerDownLeft,
+  KeyRound,
   LogOut,
   Menu,
   Moon,
@@ -228,6 +229,9 @@ export function Navbar({ collapsed, onToggleCollapse, onOpenMobile }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => navigate('/profile')} className="gap-2">
               <UserIcon className="h-4 w-4" /> Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/account/password')} className="gap-2">
+              <KeyRound className="h-4 w-4" /> Change password
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate('/settings')} className="gap-2">
               <Settings className="h-4 w-4" /> Settings

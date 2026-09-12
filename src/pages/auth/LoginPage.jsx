@@ -37,7 +37,8 @@ const ROLE_OPTIONS = [
   { value: USER_ROLES.ADMIN, label: ROLE_LABELS.admin, icon: Users },
   { value: USER_ROLES.STAFF, label: ROLE_LABELS.staff, icon: UserCog },
   { value: USER_ROLES.STUDENT, label: ROLE_LABELS.student, icon: StudentIcon },
-  { value: USER_ROLES.PARENT, label: ROLE_LABELS.parent, icon: UsersRound },
+  // Parent auth is a backend stub (no token) — hidden until it's implemented,
+  // so users don't get an "authenticated-then-bounced" broken login.
 ]
 
 const REMEMBER_KEY = 'scholaria.login.remember'

@@ -57,6 +57,14 @@ export const examinationService = {
     return apiClient.get("/exam/result", { params });
   },
 
+  // Roster: enter marks for a whole class in one grid (idempotent bulk upsert).
+  getMarksRoster(params = {}) {
+    return apiClient.get("/exam/marks-roster", { params });
+  },
+  saveMarksRoster(payload) {
+    return apiClient.post("/exam/marks-roster", payload);
+  },
+
   getExamResult(id) {
     return apiClient.get(`/exam/result/${id}`);
   },
